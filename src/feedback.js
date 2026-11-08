@@ -1,33 +1,25 @@
-// Feedback recorder: up to MAX_SECONDS of (1) a video of the dashboard with sound, (2) a WAV of exactly
-// what the analyzer heard, (3) a JSON log of every analyzer frame + settings. Saved as local files.
+// Record: up to MAX_SECONDS of the dashboard as a video with sound, settings burned into a header line.
+// The app draws the frames itself (no screen-share prompt, works on phones); the audio track is exactly
+// what the analyzer hears (shared tap node). One file, saved locally.
 
-const MAX_SECONDS = 10;
+const MAX_SECONDS = 15; // hard cap keeps files small (~5 MB)
 const OUT_W = 1280;
-const HEADER_H = 30;
+const HEADER_H = 52;
 
 const pad = (n) => String(n).padStart(2, '0');
 const stamp = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 
-function encodeWav(chunks, sampleRate) {
-  const n = chunks.reduce((s, c) => s + c.length, 0);
-  const buf = new ArrayBuffer(44 + n * 2);
-  const v = new DataView(buf);
-  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
-  str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
-  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
-  v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
-  str(36, 'data'); v.setUint32(40, n * 2, true);
-  let o = 44;
-  for (const c of chunks) for (let i = 0; i < c.length; i++, o += 2) {
-    const s = Math.max(-1, Math.min(1, c[i]));
-    v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-  }
-  return new Blob([buf], { type: 'audio/wav' });
-}
-
 function pickMime() {
   const types = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
   return (window.MediaRecorder && types.find((t) => MediaRecorder.isTypeSupported(t))) || '';
+}
+
+function browserName() {
+  const ua = navigator.userAgent;
+  const m = ua.match(/(Edg|OPR|Chrome|Firefox|Version)\/(\d+)/);
+  const name = m ? { Edg: 'Edge', OPR: 'Opera', Version: 'Safari' }[m[1]] || m[1] : 'browser';
+  const os = /Windows/.test(ua) ? 'Windows' : /Mac OS/.test(ua) ? 'macOS' : /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Linux/.test(ua) ? 'Linux' : '';
+  return `${name} ${m ? m[2] : ''}${os ? ' / ' + os : ''}`;
 }
 
 export class FeedbackRecorder {
@@ -37,53 +29,39 @@ export class FeedbackRecorder {
   constructor(hooks) {
     this.h = hooks;
     const $ = (id) => document.getElementById(id);
-    this.el = { btn: $('feedbackBtn'), panel: $('feedbackPanel'), close: $('feedbackClose'), summary: $('feedbackSummary'), links: $('feedbackLinks'), saveAll: $('feedbackSaveAll') };
+    this.el = { btn: $('feedbackBtn'), panel: $('feedbackPanel'), close: $('feedbackClose'), summary: $('feedbackSummary'), links: $('feedbackLinks') };
     this.rec = null;
-    this.files = [];
     this.el.btn.addEventListener('click', () => (this.rec ? this.stop() : this.start()));
     this.el.close.addEventListener('click', () => { this.el.panel.hidden = true; });
-    this.el.saveAll.addEventListener('click', () => this.saveAll());
+    // Never keep recording a tab the user has left
+    document.addEventListener('visibilitychange', () => { if (document.hidden && this.rec) this.stop(); });
   }
 
   get recording() { return !!this.rec; }
 
-  async start() {
+  start() {
     const session = this.h.getSession();
-    if (!session) { this.h.toast('Start Sing, Synthesize or Listen first, then press Feedback.'); return; }
+    if (!session) { this.h.toast('Start Sing, Synthesize or Listen first, then press Record.'); return; }
+    const mime = pickMime();
+    const canvas = document.createElement('canvas');
+    if (!mime || !canvas.captureStream) { this.h.toast('Recording is not supported in this browser.'); return; }
     const { ctx, tap } = session;
     const dash = document.getElementById('dashboard').getBoundingClientRect();
     const scale = OUT_W / dash.width;
-    const canvas = document.createElement('canvas');
     canvas.width = OUT_W;
     canvas.height = Math.round(dash.height * scale) + HEADER_H;
-    const t0 = new Date();
     const rec = {
-      session, canvas, g: canvas.getContext('2d'), scale, dash, t0, tStart: performance.now() / 1000,
-      chunks: [], frames: [], audio: [], sampleRate: ctx.sampleRate,
+      session, canvas, g: canvas.getContext('2d'), scale, dash, mime,
+      t0: new Date(), tStart: performance.now() / 1000, chunks: [], sampleRate: ctx.sampleRate,
     };
+    rec.dest = ctx.createMediaStreamDestination();
+    tap.connect(rec.dest);
+    const stream = new MediaStream([...canvas.captureStream(30).getVideoTracks(), ...rec.dest.stream.getAudioTracks()]);
+    rec.mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 2_500_000, audioBitsPerSecond: 128_000 });
+    rec.mr.ondataavailable = (e) => { if (e.data.size) rec.chunks.push(e.data); };
+    rec.mr.start(250);
     this.rec = rec;
-
-    // (2) exact analyzer input → WAV
-    try {
-      await ctx.audioWorklet.addModule('src/recorder-worklet.js');
-      rec.worklet = new AudioWorkletNode(ctx, 'tap-recorder', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
-      rec.worklet.port.onmessage = (e) => { if (this.rec === rec) rec.audio.push(e.data); };
-      rec.sink = ctx.createGain(); rec.sink.gain.value = 0; // keep the worklet pulled without audible output
-      tap.connect(rec.worklet).connect(rec.sink).connect(ctx.destination);
-    } catch (err) { rec.audioError = String(err); }
-
-    // (1) dashboard video + the same sound
-    const mime = pickMime();
-    if (mime && canvas.captureStream) {
-      rec.dest = ctx.createMediaStreamDestination();
-      tap.connect(rec.dest);
-      const stream = new MediaStream([...canvas.captureStream(30).getVideoTracks(), ...rec.dest.stream.getAudioTracks()]);
-      rec.mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 2_500_000 });
-      rec.mr.ondataavailable = (e) => { if (e.data.size) rec.chunks.push(e.data); };
-      rec.mr.start(250);
-      rec.mime = mime;
-    } else rec.videoError = 'MediaRecorder / canvas capture not supported in this browser';
-
+    this.composite(rec.tStart);
     this.el.panel.hidden = true;
     this.el.btn.classList.add('recording');
     this.tick();
@@ -99,18 +77,18 @@ export class FeedbackRecorder {
   }
 
   /** Called from the main render loop every frame while recording. */
-  onFrame(o, now) {
-    const rec = this.rec;
-    if (!rec) return;
-    if (o) {
-      const r = (x) => (x ? Math.round(x * 10) / 10 : 0);
-      rec.frames.push({
-        t: Math.round((now - rec.tStart) * 1000) / 1000, rmsDb: r(o.rmsDb), peakDb: r(o.peakDb),
-        clipped: o.clipped, distorted: o.distorted, voiced: o.voiced, f0: r(o.f0), midiMean: r(o.midiMean),
-        f1: r(o.f1), f2: r(o.f2), f3: r(o.f3), ring: r(o.ring),
-      });
-    }
-    this.composite(now);
+  onFrame(_o, now) { if (this.rec) this.composite(now); }
+
+  settingsLine() {
+    const d = this.h.describe();
+    const on = (b) => (b ? 'on' : 'off');
+    const parts = [
+      `Detail ${on(d.view.detail)}`, `¼ tones ${on(d.view.quarter)}`, `Follow pitch ${on(d.view.pitchAware)}`,
+      `calibrated ${d.calibrated ? 'yes' : 'no'}`,
+    ];
+    if (d.synth) parts.push(`synth F0 midi ${d.synth.midi} F1 ${d.synth.f1} F2 ${d.synth.f2} F3 ${d.synth.f3} ${d.synth.db} dB${d.synth.vibrato ? ' vib' : ''}`);
+    parts.push(browserName(), `${(this.rec.sampleRate / 1000).toFixed(1)} kHz`, `${innerWidth}×${innerHeight}`);
+    return parts.join(' · ');
   }
 
   composite(now) {
@@ -119,8 +97,11 @@ export class FeedbackRecorder {
     g.fillStyle = css.getPropertyValue('--bg') || '#0b0d12';
     g.fillRect(0, 0, canvas.width, canvas.height);
     const d = this.h.describe();
-    g.fillStyle = '#e8eaf0'; g.font = '600 14px Inter, system-ui, sans-serif'; g.textBaseline = 'middle';
-    g.fillText(`Vocal Analyzer feedback · ${t0.toLocaleString()} · ${d.mode} · ${d.voice} voice · ${(now - tStart).toFixed(1)} s`, 14, HEADER_H / 2);
+    g.textBaseline = 'middle';
+    g.fillStyle = '#e8eaf0'; g.font = '600 14px Inter, system-ui, sans-serif';
+    g.fillText(`Sing Together · ${t0.toLocaleString()} · ${d.mode} · ${d.voice} voice · ${(now - tStart).toFixed(1)} s`, 14, 16);
+    g.fillStyle = '#8b93a7'; g.font = '500 12px Inter, system-ui, sans-serif';
+    g.fillText(this.settingsLine(), 14, 36);
     g.save();
     g.translate(0, HEADER_H);
     g.scale(scale, scale);
@@ -142,7 +123,6 @@ export class FeedbackRecorder {
       const cs = getComputedStyle(el);
       g.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
       g.fillStyle = cs.color;
-      g.textBaseline = 'middle';
       const txt = el.textContent.trim().replace(/\s+/g, ' ');
       g.fillText(cs.textTransform === 'uppercase' ? txt.toUpperCase() : txt, r.x, r.y + r.h / 2);
     }
@@ -154,45 +134,24 @@ export class FeedbackRecorder {
     if (!rec) return;
     this.rec = null;
     this.el.btn.classList.remove('recording');
-    this.el.btn.textContent = '● Feedback';
-    const { session } = rec;
-    try { session.tap.disconnect(rec.worklet); } catch { /* session may be gone */ }
-    try { session.tap.disconnect(rec.dest); } catch { /* ignore */ }
-    try { rec.worklet?.disconnect(); rec.sink?.disconnect(); } catch { /* ignore */ }
-
-    const video = rec.mr ? await new Promise((res) => {
+    this.el.btn.textContent = '● Record';
+    try { rec.session.tap.disconnect(rec.dest); } catch { /* session may already be gone */ }
+    const seconds = performance.now() / 1000 - rec.tStart;
+    const blob = await new Promise((res) => {
       rec.mr.onstop = () => res(new Blob(rec.chunks, { type: rec.mime.split(';')[0] }));
       rec.mr.stop();
-    }) : null;
-    const name = `sing-feedback-${stamp(rec.t0)}`;
-    const seconds = rec.frames.length ? rec.frames[rec.frames.length - 1].t : 0;
-    const data = {
-      app: 'sing-opera-visualizer', recordedAt: rec.t0.toISOString(), seconds,
-      settings: this.h.describe(), sampleRate: rec.sampleRate, userAgent: navigator.userAgent,
-      screen: { w: innerWidth, h: innerHeight, dpr: devicePixelRatio },
-      notes: { videoError: rec.videoError, audioError: rec.audioError },
-      frames: rec.frames,
-    };
-    this.files = [];
-    if (video && !video.size) rec.videoError = rec.videoError || 'Video was empty (the page was not being drawn — was the tab in the background?)';
-    if (video && video.size) this.files.push({ name: `${name}.${rec.mime.includes('mp4') ? 'mp4' : 'webm'}`, blob: video, label: 'Screen + sound (video)' });
-    if (rec.audio.length) this.files.push({ name: `${name}.wav`, blob: encodeWav(rec.audio, rec.sampleRate), label: 'Exact analyzer audio (WAV)' });
-    this.files.push({ name: `${name}.json`, blob: new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }), label: 'Analyzer readings + settings (JSON)' });
-
-    for (const f of this.files) f.url = URL.createObjectURL(f.blob);
-    const problems = [rec.videoError, rec.audioError].filter(Boolean);
-    this.el.summary.textContent = `Recorded ${seconds.toFixed(1)} s. Save the files and send them along with a note about what you expected to see.`
-      + (problems.length ? ` (Note: ${problems.join('; ')})` : '');
-    this.el.links.innerHTML = this.files.map((f) =>
-      `<li><a href="${f.url}" download="${f.name}">${f.label}</a> <span class="sample-meta">${f.name} · ${(f.blob.size / 1024).toFixed(0)} KB</span></li>`).join('');
-    this.el.panel.hidden = false;
-  }
-
-  saveAll() {
-    for (const f of this.files) {
-      const a = document.createElement('a');
-      a.href = f.url; a.download = f.name;
-      document.body.appendChild(a); a.click(); a.remove();
+    });
+    if (!blob.size) {
+      this.h.toast('The recording came out empty — keep this tab in front while recording.');
+      return;
     }
+    const name = `sing-record-${stamp(rec.t0)}.${rec.mime.includes('mp4') ? 'mp4' : 'webm'}`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); // save straight away
+    this.el.summary.textContent = `Saved ${seconds.toFixed(1)} s to your Downloads folder. If it didn't download, use the link below.`;
+    this.el.links.innerHTML = `<li><a href="${url}" download="${name}">${name}</a> <span class="sample-meta">${(blob.size / 1024).toFixed(0)} KB</span></li>`;
+    this.el.panel.hidden = false;
   }
 }

@@ -100,7 +100,8 @@ export function drawTrace(s, hist, now, centerMidi, opts = {}) {
   const ctx = s.begin();
   const { w, h } = s;
   const left = opts.detail ? 92 : 46, right = 14, top = 10, bottom = 10;
-  const rows = h < 150 ? 4 : 5;
+  // Visible span in semitones: the default close-up, or wider when the caller zooms out
+  const rows = Math.max(opts.span || 0, h < 150 ? 4 : 5);
   const rowPx = (h - top - bottom) / rows;
   const yOf = (m) => top + (h - top - bottom) / 2 - (m - centerMidi) * rowPx;
   const xOf = (t) => w - right - ((now - t) / window) * (w - left - right);
@@ -127,12 +128,16 @@ export function drawTrace(s, hist, now, centerMidi, opts = {}) {
       ctx.fillStyle = isCur ? 'rgba(255,255,255,.22)' : 'rgba(255,255,255,.07)';
       ctx.fillRect(left, y - 0.5, w - left - right, 1);
     }
-    let name = stepName(n);
-    if (opts.detail) name += stepOctave(n);
-    ctx.font = `${isCur ? 700 : 500} ${isCur ? 14 : isQuarter ? 10 : 12}px ${C.ui}`;
+    // When zoomed out, thin the labels so they never overlap: naturals only, then only Cs
+    const nameOnly = stepName(n);
+    const sharpish = nameOnly.includes('#') || isQuarter;
+    const showLabel = isCur || rowPx >= 13 || (rowPx >= 7 && !sharpish) || (nameOnly === 'C' && !isQuarter);
+    let name = nameOnly;
+    if (opts.detail || (rowPx < 13 && nameOnly === 'C')) name += stepOctave(n);
+    ctx.font = `${isCur ? 700 : 500} ${isCur ? 14 : isQuarter || rowPx < 13 ? 10 : 12}px ${C.ui}`;
     ctx.fillStyle = isCur ? C.text : C.faint;
-    ctx.fillText(name, opts.detail ? left - 50 : left - 10, y);
-    if (opts.detail && (!isQuarter || rowPx > 30)) {
+    if (showLabel) ctx.fillText(name, opts.detail ? left - 50 : left - 10, y);
+    if (opts.detail && showLabel && (!isQuarter || rowPx > 30)) {
       ctx.font = `400 10px ${C.ui}`; ctx.fillStyle = C.faint;
       ctx.fillText(midiToFreq(n, opts.a4).toFixed(1), left - 8, y);
     }

@@ -294,7 +294,8 @@ let feedback = null;
 feedback = new FeedbackRecorder({
   getSession: () => session,
   describe: () => ({
-    mode: session?.mode === 'mic' ? 'Sing' : session?.mode === 'synth' ? 'Synthesize' : session?.mode === 'sample' ? `Listen (${session.sample.id})` : 'idle',
+    mode: session?.mode === 'mic' ? 'Sing' : session?.mode === 'synth' ? 'Synthesize'
+      : session?.mode === 'sample' ? `Listen (${session.sample.id})` : session?.mode === 'demo' ? 'Dev melody' : 'idle',
     voice, view: { ...view }, calibrated: isCalibrated, landmarks,
     synth: session?.mode === 'synth' ? { ...synth.state } : undefined,
   }),
@@ -310,7 +311,8 @@ els.stopBtn.addEventListener('click', () => { stop(); samplesUI?.render(); });
 const timeBuf = new Float32Array(FFT);
 const specBuf = new Float32Array(FFT / 2);
 let pitchHist = [], formantTrail = [], f3Trail = [], levelHist = [], lastPair = null;
-let lastDistortT = -10, lastFrameT = 0, viewCenter = 60, peakHold = -100, peakHoldT = 0, clipT = -10;
+const BASE_SPAN = 5, MAX_SPAN = 17; // semitones visible in the pitch trace
+let viewSpan = BASE_SPAN, lastDistortT = -10, lastFrameT = 0, viewCenter = 60, peakHold = -100, peakHoldT = 0, clipT = -10;
 function resetHistory() { pitchHist = []; formantTrail = []; f3Trail = []; levelHist = []; lastPair = null; }
 
 function readFrame(now) {
@@ -357,10 +359,21 @@ function render() {
     els.tuneState.textContent = state === 'in' ? 'in tune'
       : state === 'near' ? (cents > 0 ? 'a little sharp' : 'a little flat')
       : 'between notes';
-    // Time-based easing (frame-rate independent); snap on big leaps
+    // Auto-zoom: if the pitch has recently moved over a wide range (scale, arpeggio, wobbly sustain),
+    // smoothly widen the trace to fit it; zoom back in on a steady note.
     const dt = Math.min(0.5, now - (lastFrameT || now));
-    if (Math.abs(nearest - viewCenter) > 3) viewCenter = nearest;
-    else viewCenter += (nearest - viewCenter) * (1 - Math.exp(-dt / 0.08));
+    const recent = pitchHist.filter((p) => now - p.t < 3).map((p) => p.midi).sort((a, b) => a - b);
+    let targetSpan = BASE_SPAN, targetCenter = nearest;
+    if (recent.length > 10) {
+      const lo = recent[Math.floor(recent.length * 0.05)], hi = recent[Math.floor(recent.length * 0.95)];
+      if (hi - lo > BASE_SPAN - 2) {
+        targetSpan = Math.min(MAX_SPAN, hi - lo + 3);
+        targetCenter = (lo + hi) / 2;
+      }
+    }
+    viewSpan += (targetSpan - viewSpan) * (1 - Math.exp(-dt / 0.5)); // ~0.5 s zoom
+    if (viewSpan < BASE_SPAN + 0.5 && Math.abs(targetCenter - viewCenter) > 3) viewCenter = targetCenter; // leap
+    else viewCenter += (targetCenter - viewCenter) * (1 - Math.exp(-dt / (viewSpan > BASE_SPAN + 0.5 ? 0.4 : 0.08)));
     els.detailReadout.textContent = `${cents >= 0 ? '+' : '−'}${Math.abs(cents).toFixed(0)}¢ · ${o.f0 ? o.f0.toFixed(1) + ' Hz' : ''}`;
   } else {
     els.detailReadout.textContent = '';
@@ -374,7 +387,7 @@ function render() {
   prune(pitchHist, now, 5);
   els.detailReadout.hidden = !view.detail;
   drawGauge(surf.gauge, cents, rawCents, state, view);
-  drawTrace(surf.trace, pitchHist, now, viewCenter, view);
+  drawTrace(surf.trace, pitchHist, now, viewCenter, { ...view, span: viewSpan });
 
   // ---- Formants ----
   const cur = o?.f1 && o?.f2 ? { f1: o.f1, f2: o.f2 } : null;
