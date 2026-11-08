@@ -306,14 +306,25 @@ export function drawF3(s, f3, trail, ring, now, opts = {}) {
   if (!tiny) ctx.fillText('RING', 14, ry + 6);
   const mx = tiny ? 10 : 50, mw = w - mx - (tiny ? 10 : 14);
   roundRect(ctx, mx, ry, mw, 8, 4); ctx.fillStyle = C.track; ctx.fill();
+  // Ring = singer's formant level L_SF (Sundberg 1995): 0 dB ≈ ordinary speech-like voice for this vowel,
+  // ≥ +6 dB = singer's formant present. Bar spans −15 … +15 dB.
+  const LO = -15, HI = 15;
+  const rx = (db) => mx + ((Math.max(LO, Math.min(HI, db)) - LO) / (HI - LO)) * mw;
   if (ring) {
-    const v = Math.max(0, Math.min(1, (ring + 30) / 30)); // −30 dB … 0 dB
     const rg = ctx.createLinearGradient(mx, 0, mx + mw, 0);
-    rg.addColorStop(0, rgba(C.accent, 0.5)); rg.addColorStop(1, C.green);
-    roundRect(ctx, mx, ry, mw * v, 8, 4); ctx.fillStyle = rg; ctx.fill();
-    if (opts.detail) {
-      ctx.font = `500 9px ${C.ui}`; ctx.textAlign = 'right'; ctx.fillStyle = C.muted;
-      ctx.fillText(`${ring.toFixed(0)} dB`, w - 14, ry + 20);
+    rg.addColorStop(0, rgba(C.accent, 0.35)); rg.addColorStop((6 - LO) / (HI - LO), rgba(C.accent, 0.8)); rg.addColorStop(1, C.green);
+    roundRect(ctx, mx, ry, rx(ring) - mx, 8, 4); ctx.fillStyle = rg; ctx.fill();
+  }
+  // Marks: 0 dB (speech-like) and +6 dB (singer's formant threshold)
+  ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(rx(0) - 0.5, ry - 3, 1, 14);
+  ctx.fillStyle = C.green; ctx.fillRect(rx(6) - 1, ry - 4, 2, 16);
+  if (!tiny) {
+    ctx.font = `500 9px ${C.ui}`; ctx.textBaseline = 'top'; ctx.textAlign = 'center';
+    ctx.fillStyle = C.faint; ctx.fillText(opts.detail ? '0 dB speech' : 'speech', rx(0), ry + 12);
+    ctx.fillStyle = rgba(C.green, 0.8); ctx.fillText(opts.detail ? '+6 dB ring' : 'ring', rx(6), ry + 12);
+    if (opts.detail && ring) {
+      ctx.textAlign = 'right'; ctx.fillStyle = C.text;
+      ctx.fillText(`${ring >= 0 ? '+' : ''}${ring.toFixed(0)} dB`, w - 14, ry + 12);
     }
   }
 }

@@ -35,7 +35,8 @@ class FormantSynth extends AudioWorkletProcessor {
     this.y1 = new Float64Array(5);
     this.y2 = new Float64Array(5);
     this.cur = null; // smoothed parameter values
-    this.ms = 0.01; // running mean square for normalisation
+    this.ms = 0; // running mean square for normalisation (seeded from the first block)
+    this.env = 0; // start-up fade-in 0 → 1 (prevents the click/pop when sound starts)
   }
 
   process(_inputs, outputs, p) {
@@ -66,6 +67,7 @@ class FormantSynth extends AudioWorkletProcessor {
     if (ti < 0) ti = BAND_TOPS.length - 1;
     const table = this.tables[ti];
 
+    const fadeStep = 1 / (0.08 * fs); // 80 ms fade-in
     for (let n = 0; n < ch.length; n++) {
       this.vibPhase += 5.5 / fs;
       if (this.vibPhase >= 1) this.vibPhase -= 1;
@@ -81,8 +83,13 @@ class FormantSynth extends AudioWorkletProcessor {
         this.y1[r] = y;
         s = y;
       }
-      this.ms += (s * s - this.ms) * 0.0002; // ~100 ms
-      const y = (s / Math.sqrt(this.ms + 1e-12)) * 0.22 * c.gain;
+      // Seed the level normaliser with the actual signal level so the first samples don't spike
+      if (this.ms === 0) this.ms = s * s + 1e-6;
+      // Track the level fast (~4 ms) while fading in so the normaliser never overshoots, then smoothly (~100 ms)
+      this.ms += (s * s - this.ms) * (this.env < 1 ? 0.005 : 0.0002);
+      if (this.env < 1) this.env = Math.min(1, this.env + fadeStep);
+      const e = this.env * this.env * (3 - 2 * this.env); // smoothstep
+      const y = (s / Math.sqrt(this.ms + 1e-12)) * 0.22 * c.gain * e;
       for (let k = 0; k < out.length; k++) out[k][n] = y;
     }
     return true;

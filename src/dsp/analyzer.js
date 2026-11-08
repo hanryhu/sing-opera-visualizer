@@ -2,6 +2,7 @@
 
 import { yin, freqToMidi, refinePitch } from './pitch.js';
 import { estimateFormants, estimateFormantsHarmonic } from './formants.js';
+import { singersFormantLevel } from './ring.js';
 
 // Above this F0 the harmonics are too sparse for plain LPC; fit the harmonic peaks (DAP) instead.
 const DAP_F0 = 300;
@@ -123,7 +124,12 @@ export class Analyzer {
           this.f2.push(fm.f2, t);
           this.f3.push(fm.f3, t);
         }
-        if (spectrumDb) this.ring.push(this.ringRatio(spectrumDb) + 100, t); // offset keeps it non-zero
+        // Ring = singer's formant level relative to what this vowel's F1/F2 predict (Sundberg 1995).
+        // Not computed on distorted frames; unreliable at high F0 (sparse partials), so skipped above 600 Hz.
+        if (!distorted && out.f0 < 600 && this.f1.value && this.f2.value) {
+          const r = singersFormantLevel(frame, this.sr, out.f0, this.f1.value, this.f2.value);
+          if (r && Number.isFinite(r.lsf)) this.ring.push(r.lsf + 100, t); // offset keeps it non-zero
+        }
       }
     }
     if (t - this.lastVoicedT > HOLD) this.pitchHist = [];

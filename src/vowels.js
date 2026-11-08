@@ -77,7 +77,16 @@ export const SOURCES = [
   },
   {
     cite: 'Sundberg, J. (1974). Articulatory interpretation of the “singing formant”. JASA 55(4), 838–844.',
-    use: 'Singer’s formant (~2.8–3.4 kHz) zone on the F3 bar.',
+    use: 'Singer’s formant as a clustering of F3–F5 (green zone on the F3 bar).',
+  },
+  {
+    cite: 'Sundberg, J. (1995). The singer’s formant revisited. STL-QPSR 36(2–3), 83–96.',
+    url: 'https://www.speech.kth.se/qpsr/1995/1995_36_2-3_083-096.pdf',
+    use: 'RING: observed minus vowel-predicted level near 3 kHz; ≥ 6 dB = singer’s formant. Calibrated to his Fig. 8 (−30 dB at F1 0.5 / F2 1 kHz).',
+  },
+  {
+    cite: 'Omori, K., Kacker, A., Carroll, L. M., Riley, W. D. & Blaugrund, S. M. (1996). Singing power ratio: quantitative evaluation of singing voice quality. Journal of Voice 10(3), 228–235.',
+    use: 'Related fixed-band measure (2–4 kHz vs 0–2 kHz); not used because it varies with the vowel.',
   },
 ];
 

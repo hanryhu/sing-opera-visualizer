@@ -162,8 +162,10 @@ async function start(mode, sample) {
       src.loop = true; // short clips loop until stopped (or the tab is hidden)
       if (!MUTE_DEMO) {
         const out = ctx.createGain();
-        out.gain.value = 0.9;
+        out.gain.setValueAtTime(0, ctx.currentTime);
+        out.gain.linearRampToValueAtTime(0.9, ctx.currentTime + 0.08); // fade in (no click)
         src.connect(out).connect(ctx.destination);
+        me.out = out;
       }
       let ana = null;
       if (anaBuf) {
@@ -192,8 +194,9 @@ async function start(mode, sample) {
       node.connect(tap);
       if (!MUTE_DEMO) {
         const out = ctx.createGain();
-        out.gain.value = 0.8;
+        out.gain.value = 0.8; // the worklet itself fades in
         node.connect(out).connect(ctx.destination);
+        me.out = out;
       }
       session.synthNode = node;
     } else if (mode === 'mic') {
@@ -251,9 +254,19 @@ function stop() { // never returns to the landing page
   const wasSynth = session?.mode === 'synth';
   if (session) {
     session.stream?.getTracks().forEach((t) => t.stop());
-    try { session.src?.stop(); } catch { /* noop */ }
-    try { session.ana?.stop(); } catch { /* noop */ }
-    session.ctx.close().catch(() => {});
+    // Fade audible output out over ~60 ms before closing, so stopping doesn't click
+    const { ctx, out, src, ana, stream } = session;
+    stream?.getTracks().forEach((t) => t.stop());
+    if (out && ctx.state === 'running') {
+      out.gain.cancelScheduledValues(ctx.currentTime);
+      out.gain.setValueAtTime(out.gain.value, ctx.currentTime);
+      out.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.06);
+      setTimeout(() => { try { src?.stop(); ana?.stop(); } catch { /* noop */ } ctx.close().catch(() => {}); }, 90);
+    } else {
+      try { src?.stop(); } catch { /* noop */ }
+      try { ana?.stop(); } catch { /* noop */ }
+      ctx.close().catch(() => {});
+    }
   }
   session = null;
   els.stopBtn.hidden = true;
