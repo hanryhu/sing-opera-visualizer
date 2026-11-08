@@ -26,7 +26,7 @@ Dev: `?devtest` runs the synthetic melody (vibrato, tuning errors) silently; `?d
 
 ## Recording
 
-**● Record** (header) saves up to 15 s of the dashboard as a video (`sing-record-<time>.webm`) with the exact sound the
+**● Record** (header) saves up to 30 s of the dashboard as a video (`sing-record-<time>.webm`) with the exact sound the
 analyzer heard and a header line listing the settings (mode, voice, toggles, synth values, browser, sample rate).
 Replaying its audio through `src/dsp/analyzer.js` reproduces a report.
 

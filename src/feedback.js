@@ -2,7 +2,7 @@
 // The app draws the frames itself (no screen-share prompt, works on phones); the audio track is exactly
 // what the analyzer hears (shared tap node). One file, saved locally.
 
-const MAX_SECONDS = 15; // hard cap keeps files small (~5 MB)
+const MAX_SECONDS = 30; // time limit; measured ~80-170 KB/s, so typically ~2.5-5 MB (worst case ~10 MB)
 const OUT_W = 1280;
 const HEADER_H = 52;
 
