@@ -332,3 +332,7 @@ body {
   padding: 10px 14px; font-size: 13px; box-shadow: 0 16px 40px rgba(0, 0, 0, .5);
 }
 .toast[hidden] { display: none; }
+/* Sing is the primary action: green, like the original Start button */
+.mode-switch.big button[data-mode="mic"] { background: var(--green); color: #04150b; }
+.mode-switch.big button[data-mode="mic"]:hover { background: #4ff093; }
+.mode-switch button[data-mode="mic"][aria-checked="true"] { background: rgba(54, 224, 127, .16); color: var(--green); }
