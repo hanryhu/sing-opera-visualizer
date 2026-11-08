@@ -1,13 +1,13 @@
 import { Analyzer } from './dsp/analyzer.js';
 import { tuningState, nearestStep, stepName, stepOctave } from './dsp/pitch.js';
 import { renderDemo } from './demo.js';
-import { VOICE_PRESETS, extraVowels } from './vowels.js';
+import { VOICE_PRESETS, extraVowels, roundingPair, SOURCES } from './vowels.js';
 import { CalibrationUI, calibratedLandmarks } from './calibration.js';
 import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter } from './ui/panels.js';
 
 const FFT = 4096;
 const PARAMS = new URLSearchParams(location.search);
-const MUTE_DEMO = PARAMS.has('demo');
+const MUTE_DEMO = PARAMS.has('demo') || PARAMS.has('test'); // dev URLs play silently
 const $ = (id) => document.getElementById(id);
 const els = {
   landing: $('landing'), startBtn: $('startBtn'), demoBtn: $('demoBtn'), error: $('errorMsg'),
@@ -39,7 +39,7 @@ function setVoice(v) {
   store.set('va.voice', v);
   document.querySelectorAll('.segmented button').forEach((b) =>
     b.setAttribute('aria-checked', String(b.dataset.voice === v)));
-  if (session?.mode === 'demo') startDemoSource();
+  if (session?.mode === 'demo' || session?.mode === 'test') startDemoSource();
   refreshLandmarks();
   calib?.voiceChanged();
 }
@@ -104,7 +104,7 @@ async function start(mode) {
     els.landing.hidden = true;
     els.stopBtn.hidden = false;
     els.chip.hidden = false;
-    els.chip.textContent = mode === 'mic' ? 'Listening' : 'Demo voice';
+    els.chip.textContent = mode === 'mic' ? 'Listening' : mode === 'test' ? 'Test signal' : 'Demo voice';
     resetHistory();
   } catch (err) {
     stop(true);
@@ -115,7 +115,8 @@ async function start(mode) {
 function startDemoSource(only = PARAMS.get('demo') || undefined) {
   const { ctx, analyser } = session;
   if (session.src) { try { session.src.stop(); } catch { /* already stopped */ } }
-  const demo = renderDemo(ctx.sampleRate, voice, { only });
+  const steady = session.mode === 'test' || PARAMS.has('test');
+  const demo = renderDemo(ctx.sampleRate, voice, { only, steady });
   const buf = ctx.createBuffer(1, demo.samples.length, ctx.sampleRate);
   buf.copyToChannel(demo.samples, 0);
   const src = ctx.createBufferSource();
@@ -163,14 +164,15 @@ function showError(err) {
 
 els.startBtn.addEventListener('click', () => start('mic'));
 els.demoBtn.addEventListener('click', () => start('demo'));
+document.getElementById('testBtn').addEventListener('click', () => start('test'));
 els.stopBtn.addEventListener('click', () => stop());
 
 /* ---------------- analysis + render loop ---------------- */
 const timeBuf = new Float32Array(FFT);
 const specBuf = new Float32Array(FFT / 2);
-let pitchHist = [], formantTrail = [], f3Trail = [];
+let pitchHist = [], formantTrail = [], f3Trail = [], levelHist = [], lastPair = null;
 let lastFrameT = 0, viewCenter = 60, peakHold = -100, peakHoldT = 0, clipT = -10;
-function resetHistory() { pitchHist = []; formantTrail = []; f3Trail = []; }
+function resetHistory() { pitchHist = []; formantTrail = []; f3Trail = []; levelHist = []; lastPair = null; }
 
 function readFrame(now) {
   const { analyser, ctx, demo } = session;
@@ -190,6 +192,7 @@ const prune = (arr, now, keep) => { while (arr.length && now - arr[0].t > keep) 
 
 function frame() {
   requestAnimationFrame(frame);
+  window.__vaFrames = (window.__vaFrames || 0) + 1;
   const now = performance.now() / 1000;
   let o = null;
   if (session) {
@@ -242,7 +245,8 @@ function frame() {
     uncertain, detail: view.detail, calibrated: isCalibrated,
     extras: view.detail ? extraVowels(voice) : [],
   });
-  drawF3(surf.f3, o?.f3 || 0, f3Trail, o?.ring || 0, now, view);
+  if (cur && o.voiced) lastPair = roundingPair(cur.f1, cur.f2, landmarks) || lastPair;
+  drawF3(surf.f3, o?.f3 || 0, f3Trail, o?.ring || 0, now, { ...view, pair: lastPair });
   calib.tick(o, now);
 
   // ---- Level ----
@@ -251,14 +255,27 @@ function frame() {
   else if (now - peakHoldT > 1) peakHold -= 0.6;
   if (o?.clipped) clipT = now;
   els.clip.classList.toggle('on', now - clipT < 1.5);
-  drawMeter(surf.meter, rms, peakHold, view);
+  if (o) levelHist.push({ t: now, db: o.rmsDb, clip: o.clipped });
+  prune(levelHist, now, 8.5);
+  drawMeter(surf.meter, rms, peakHold, view, levelHist, now);
 }
 requestAnimationFrame(frame);
 
 // Never leave the demo voice playing in a background tab.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && session?.mode === 'demo') stop();
+  if (document.hidden && (session?.mode === 'demo' || session?.mode === 'test')) stop();
 });
 
 // Dev hook: ?demo autostarts the demo voice silently (analysis only) for visual QA.
-if (MUTE_DEMO) start('demo');
+if (PARAMS.has('test')) start('test');
+else if (PARAMS.has('demo')) start('demo');
+
+/* ---------------- help ---------------- */
+const help = document.getElementById('helpDialog');
+const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+document.getElementById('helpSources').innerHTML = SOURCES.map((src) =>
+  `<li>${src.url ? `<a href="${esc(src.url)}" target="_blank" rel="noopener">${esc(src.cite)}</a>` : esc(src.cite)}` +
+  `<span class="use">${esc(src.use)}</span></li>`).join('');
+document.getElementById('helpBtn').addEventListener('click', () => help.showModal());
+document.getElementById('helpClose').addEventListener('click', () => help.close());
+help.addEventListener('click', (e) => { if (e.target === help) help.close(); });

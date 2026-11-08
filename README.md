@@ -22,7 +22,9 @@ The mic needs a secure context: `localhost` or HTTPS.
 - **Calibrate**: record a e i o u (ɛ ɔ optional, else interpolated); saved per voice type in
   localStorage and used instead of the default landmarks. "reset" on the map badge reverts.
 
-Dev: `?demo=a` sustains a single vowel; `window.__va.demo('e')` switches it (calibration QA).
+**Test signal** (landing page) plays a steady synthetic [a]: flat pitch line, fixed F3, one still dot.
+
+Dev: `?test` starts the test signal silently; `?demo=a` sustains a single vowel; `window.__va.demo('e')` switches it (calibration QA).
 
 ## Layout
 

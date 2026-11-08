@@ -82,14 +82,18 @@ body {
   flex: 1;
   display: grid;
   gap: var(--gap);
-  padding: var(--gap) 20px 20px;
-  grid-template-columns: minmax(150px, 190px) 1fr;
-  grid-template-rows: 210px minmax(340px, 1fr) 64px;
+  padding: var(--gap) 20px 16px;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
   grid-template-areas:
     "tuner tuner"
     "f3 map"
     "meter meter";
   min-height: 0;
+}
+@media (min-width: 761px) {
+  /* Everything in one field of view: thirds, no page scroll */
+  body { height: 100dvh; overflow: hidden; }
 }
 .panel {
   position: relative; background: var(--panel); border: 1px solid var(--line);
@@ -109,15 +113,16 @@ body {
 .tuner { grid-area: tuner; display: grid; grid-template-columns: minmax(220px, 300px) 1fr; grid-template-rows: minmax(0, 1fr); }
 .f3 { grid-area: f3; }
 .vowels { grid-area: map; }
-.meter { grid-area: meter; display: flex; align-items: center; }
+.meter { grid-area: meter; }
+.meter .fill { position: absolute; inset: 0; }
 
 /* tuner readout */
 .tuner-readout {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 26px 16px 14px; border-right: 1px solid var(--line); gap: 2px;
+  padding: 22px 16px 8px; border-right: 1px solid var(--line); gap: 2px; min-height: 0;
 }
 .note {
-  font-weight: 700; font-size: 76px; line-height: 1; letter-spacing: -.03em;
+  font-weight: 700; font-size: clamp(44px, 8.5vh, 76px); line-height: 1; letter-spacing: -.03em;
   color: var(--faint); display: flex; align-items: flex-start;
   font-variant-numeric: tabular-nums;
 }
@@ -136,10 +141,8 @@ body {
 }
 
 /* meter */
-.meter .panel-label { position: static; padding: 0 0 0 16px; width: 72px; flex: none; }
-.meter .fill { flex: 1; align-self: stretch; }
 .clip {
-  flex: none; margin: 0 14px; font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  position: absolute; top: 8px; right: 14px; z-index: 2; font-size: 11px; font-weight: 700; letter-spacing: .08em;
   padding: 5px 9px; border-radius: 6px; color: var(--faint); border: 1px solid var(--line);
   transition: all .1s ease;
 }
@@ -177,13 +180,14 @@ body {
   .dashboard {
     flex: none;
     padding: 10px 16px 16px; gap: 10px;
-    grid-template-columns: 96px 1fr;
-    grid-template-rows: auto 380px 56px;
+    grid-template-columns: 64px 1fr; /* F3 compressed so the vowel map gets the width */
+    grid-template-rows: auto 400px 150px;
   }
   .tuner { grid-template-columns: 1fr; grid-template-rows: auto 120px; }
+  .f3 .panel-label .muted { display: none; }
+  .f3 .panel-label { left: 10px; }
   .tuner-readout { border-right: 0; border-bottom: 1px solid var(--line); padding: 28px 12px 10px; }
   .note { font-size: 60px; }
-  .meter .panel-label { width: 56px; padding-left: 12px; }
   .landing-card { padding: 24px; }
   .landing h1 { font-size: 23px; }
 }
@@ -252,3 +256,25 @@ body {
   .controls { gap: 8px; }
   .controls .chip { display: none; }
 }
+
+/* ---------- help ---------- */
+.help-btn { width: 32px; padding: 6px 0; font-weight: 700; }
+.help {
+  width: min(620px, calc(100vw - 32px)); max-height: min(80dvh, 760px); padding: 0;
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--line-strong); border-radius: 16px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .6);
+}
+.help::backdrop { background: rgba(11, 13, 18, .7); backdrop-filter: blur(4px); }
+.help-head {
+  display: flex; align-items: center; justify-content: space-between; padding: 16px 20px;
+  border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel-2);
+}
+.help-head h2 { margin: 0; font-size: 17px; }
+.help-body { padding: 4px 20px 20px; overflow: auto; }
+.help-body h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 18px 0 6px; }
+.help-body p { margin: 0; color: #c9cfdb; font-size: 14px; }
+.help-body b.g { color: var(--green); } .help-body b.o { color: var(--orange); }
+.sources { margin: 0; padding-left: 20px; font-size: 13px; color: #c9cfdb; display: grid; gap: 8px; }
+.sources a { color: var(--accent); }
+.sources .use { display: block; color: var(--faint); font-size: 12px; }
+.help .fineprint { margin-top: 14px !important; }

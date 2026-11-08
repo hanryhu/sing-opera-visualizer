@@ -38,7 +38,9 @@ class Resonator {
  */
 export function renderDemo(fs, voice = 'low', opts = {}) {
   const preset = VOICE_PRESETS[voice];
+  // opts.steady: test signal — one vowel, one pitch, no vibrato, constant level.
   // opts.only: sustain a single vowel (used for testing calibration)
+  if (opts.steady) opts = { ...opts, only: opts.only || 'a' };
   const vowels = opts.only
     ? Array(7).fill(preset.vowels.find((v) => v.ipa === opts.only) || preset.vowels[3])
     : preset.vowels;
@@ -46,9 +48,10 @@ export function renderDemo(fs, voice = 'low', opts = {}) {
   // Melody (MIDI) — one note per vowel. Low: A3..E4, High: D4..A4
   // (kept in the middle voice: above ~500 Hz LPC formants become unreliable).
   const base = voice === 'low' ? 57 : 62;
-  const notes = opts.notes ?? [0, 2, 4, 5, 7, 5, 4].map((d) => base + d);
+  const notes = opts.notes ?? (opts.steady ? Array(7).fill(base + 2) : [0, 2, 4, 5, 7, 5, 4].map((d) => base + d));
   // Intentional intonation errors (cents) so the tuner shows all states.
-  const detune = opts.detune ?? [0, 0, -20, 0, 45, 0, 15];
+  const detune = opts.detune ?? (opts.steady ? Array(7).fill(0) : [0, 0, -20, 0, 45, 0, 15]);
+  const vibAmount = opts.steady ? 0 : 0.45; // semitones
   const len = Math.floor(seg * vowels.length * fs);
   const out = new Float32Array(len);
 
@@ -73,7 +76,7 @@ export function renderDemo(fs, voice = 'low', opts = {}) {
     const midiPrev = notes[prevIdx] + detune[prevIdx] / 100;
     const midiCur = notes[idx] + detune[idx] / 100;
     const pmix = idx === 0 ? 1 : Math.min(1, local / 0.08);
-    const vibDepth = Math.min(1, Math.max(0, (local - 0.35) / 0.4)) * 0.45; // semitones
+    const vibDepth = Math.min(1, Math.max(0, (local - 0.35) / 0.4)) * vibAmount;
     const midi = midiPrev + (midiCur - midiPrev) * pmix + vibDepth * Math.sin(2 * Math.PI * 5.6 * t);
     const f0 = midiToFreq(midi);
 
@@ -82,7 +85,7 @@ export function renderDemo(fs, voice = 'low', opts = {}) {
     const pos = phase * TABLE_SIZE;
     const i0 = pos | 0;
     let s = table[i0] + (table[i0 + 1] - table[i0]) * (pos - i0);
-    s += (Math.random() - 0.5) * 0.02; // breath
+    if (!opts.steady) s += (Math.random() - 0.5) * 0.02; // breath
 
     s = res[0].step(s, f1, 70, fs);
     s = res[1].step(s, f2, 90, fs);
@@ -92,7 +95,7 @@ export function renderDemo(fs, voice = 'low', opts = {}) {
 
     // Amplitude envelope: short dip between notes, fade at loop edges
     let env = 1;
-    if (local < 0.04) env = 0.35 + 0.65 * (local / 0.04);
+    if (!opts.steady && local < 0.04) env = 0.35 + 0.65 * (local / 0.04);
     if (t < 0.15) env *= t / 0.15;
     if (len / fs - t < 0.15) env *= (len / fs - t) / 0.15;
     out[n] = s * env;

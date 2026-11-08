@@ -29,6 +29,7 @@
         <button role="radio" data-voice="low" aria-label="Low voice" title="Tenor · baritone · bass">Low voice</button>
       </div>
       <span id="sourceChip" class="chip" hidden></span>
+      <button id="helpBtn" class="toggle help-btn" aria-label="Help and sources" title="Help and sources">?</button>
       <button id="stopBtn" class="btn btn-ghost" hidden>Stop</button>
     </div>
   </header>
@@ -86,6 +87,34 @@
     </div>
   </aside>
 
+  <dialog id="helpDialog" class="help" aria-labelledby="helpTitle">
+    <div class="help-head">
+      <h2 id="helpTitle">How to read the screen</h2>
+      <button id="helpClose" class="icon-btn" aria-label="Close help">×</button>
+    </div>
+    <div class="help-body">
+      <h3>Pitch</h3>
+      <p>The big letter is the nearest note. <b class="g">Green</b> = within 10¢, <b class="o">orange</b> = within 30¢,
+        grey = between notes. The colour uses your pitch averaged over ~½ s, so vibrato doesn't flicker it; the trace
+        shows the raw pitch so you can see vibrato width and evenness.</p>
+      <h3>F3 · ring</h3>
+      <p>The third formant. Lip rounding lowers it, so the pointer moves toward <i>rounded</i>. The labels show the
+        unrounded/rounded pair for the vowel you're singing (e.g. ʌ / ɔ). The green zone around 3 kHz is the singer's
+        formant region; <i>RING</i> compares energy at 2.5–3.5 kHz with 0.3–2 kHz.</p>
+      <h3>Vowel · F1 × F2</h3>
+      <p>Laid out like the IPA chart: front vowels left, close vowels top. Circles are the seven Italian vowels for
+        your voice type, or your own after <i>Calibrate</i>. Above ~520 Hz (high soprano notes) the reading is
+        approximate — the harmonics are too sparse to resolve formants.</p>
+      <h3>Input</h3>
+      <p>Microphone level in dB relative to digital full scale (not SPL). Stay in the green; <i>CLIP</i> means the
+        signal hit maximum and readings will be distorted.</p>
+      <h3>Sources</h3>
+      <ol id="helpSources" class="sources"></ol>
+      <p class="fineprint">Default landmarks are population averages from speech, not singing; calibrate for the
+        most accurate map.</p>
+    </div>
+  </dialog>
+
   <div id="landing" class="landing">
     <div class="landing-card">
       <h1>Sing Together</h1>
@@ -93,6 +122,7 @@
       <div class="landing-actions">
         <button id="startBtn" class="btn btn-primary">Start analyzing</button>
         <button id="demoBtn" class="btn btn-secondary">Try demo voice</button>
+        <button id="testBtn" class="btn btn-secondary" title="Steady synthetic [a]: no vibrato, constant level">Test signal</button>
       </div>
       <p id="errorMsg" class="error" role="alert" hidden></p>
       <p class="fineprint">Audio data never leaves your device.</p>
