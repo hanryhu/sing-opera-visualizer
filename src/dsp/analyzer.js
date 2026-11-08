@@ -69,15 +69,32 @@ export class Analyzer {
       const { f0, aperiodicity } = yin(frame.subarray(tail), this.sr);
       if (f0 >= 60 && f0 <= 1500 && aperiodicity < MAX_APERIODICITY) {
         out.voiced = true;
-        out.f0 = f0;
-        out.midiRaw = freqToMidi(f0, this.a4);
+        let midi = freqToMidi(f0, this.a4);
+        // Pitch cleanup. Recent raw readings (reset after a gap in voicing):
+        if (t - this.lastVoicedT > HOLD) this.rawHist = [];
+        this.rawHist = this.rawHist || [];
+        this.rawHist.push(midi);
+        if (this.rawHist.length > 5) this.rawHist.shift();
+        const recent = [...this.rawHist].sort((a, b) => a - b)[this.rawHist.length >> 1];
+        // (1) Octave folding: a reading ~an octave from the recent pitch is almost always the
+        //     tracker locking onto the 2nd harmonic (or a subharmonic) — weak fundamentals in old
+        //     recordings make this common. A real octave leap survives: it moves `recent` within 3 frames.
+        const dev = midi - recent;
+        if (Math.abs(Math.abs(dev) - 12) < 0.8) midi -= 12 * Math.sign(dev);
+        // (2) Median of the last 5 (folded) readings removes remaining one-frame spikes.
+        this.foldHist = this.rawHist.length === 1 ? [] : this.foldHist || [];
+        this.foldHist.push(midi);
+        if (this.foldHist.length > 5) this.foldHist.shift();
+        midi = [...this.foldHist].sort((a, b) => a - b)[this.foldHist.length >> 1];
+        out.midiRaw = midi;
+        out.f0 = 440 * Math.pow(2, (midi - 69) / 12) * (this.a4 / 440);
         this.lastVoicedT = t;
         if (this.pitchHist.length && Math.abs(this.pitchHist.at(-1).midi - out.midiRaw) > 2.5) {
           this.pitchHist = []; // note change / octave jump: restart averaging
         }
         this.pitchHist.push({ t, midi: out.midiRaw });
 
-        let fm = f0 > DAP_F0 ? estimateFormantsHarmonic(frame, this.sr, f0) : null;
+        let fm = out.f0 > DAP_F0 ? estimateFormantsHarmonic(frame, this.sr, out.f0) : null;
         if (!fm || !fm.f1 || !fm.f2) fm = estimateFormants(frame, this.sr); // fall back to LPC
         if (fm) {
           this.f1.push(fm.f1, t);

@@ -3,6 +3,8 @@
 // via Wikimedia Commons, all licensed CC BY-SA 4.0. Each file is an excerpt of the
 // original, downmixed to mono, loudness-normalised, cut at breaths to loop cleanly (50 ms fades) and
 // re-encoded (Ogg Vorbis + MP3, 96 kbps).
+// `analysisFiles` are Demucs (htdemucs_ft) isolated-vocal stems of the same clips,
+// sample-aligned and equal in length to `files`, for feeding the analyzer only.
 // Full attribution: samples/CREDITS.md
 //
 // `year` is a number only where Commons gives a specific date; otherwise null,
@@ -22,6 +24,7 @@ export const SAMPLES = [
     aria: 'Il lacerato spirito', opera: 'Simon Boccanegra', composer: 'Verdi',
     singer: 'Oreste Luppi', year: 1905, date: '1905', label: 'Fonotipia',
     files: ['samples/bass.ogg', 'samples/bass.mp3'], voice: 'low',
+    analysisFiles: ['samples/bass.vocals.ogg', 'samples/bass.vocals.mp3'],
     license: LICENSE, licenseUrl: LICENSE_URL,
     source: 'https://commons.wikimedia.org/wiki/File:ICBSA_Verdi_-_Simon_Boccanegra,_Il_lacerato_spirito.ogg',
     credit: credit('Oreste Luppi', 'bass', 'Simon Boccanegra', 'Il lacerato spirito', 'Fonotipia', '1905'),
@@ -32,6 +35,7 @@ export const SAMPLES = [
     aria: 'Di Provenza il mar, il suol', opera: 'La traviata', composer: 'Verdi',
     singer: 'Riccardo Stracciari', year: null, date: 'between 1900 and 1950', label: 'Columbia',
     files: ['samples/baritone.ogg', 'samples/baritone.mp3'], voice: 'low',
+    analysisFiles: ['samples/baritone.vocals.ogg', 'samples/baritone.vocals.mp3'],
     license: LICENSE, licenseUrl: LICENSE_URL,
     source: 'https://commons.wikimedia.org/wiki/File:ICBSA_Verdi_-_La_traviata,_Di_Provenza.ogg',
     credit: credit('Riccardo Stracciari', 'baritone', 'La traviata', 'Di Provenza', 'Columbia', 'recorded between 1900 and 1950'),
@@ -42,6 +46,7 @@ export const SAMPLES = [
     aria: "O tu che in seno agli angeli", opera: 'La forza del destino', composer: 'Verdi',
     singer: 'Enrico Caruso', year: null, date: 'between 1900 and 1921', label: 'Grammofono',
     files: ['samples/tenor.ogg', 'samples/tenor.mp3'], voice: 'low',
+    analysisFiles: ['samples/tenor.vocals.ogg', 'samples/tenor.vocals.mp3'],
     license: LICENSE, licenseUrl: LICENSE_URL,
     source: "https://commons.wikimedia.org/wiki/File:ICBSA_Verdi_-_La_forza_del_destino,_O_tu_che_in_seno_agl'angeli.ogg",
     credit: credit('Enrico Caruso', 'tenor', 'La forza del destino', "O tu che in seno agl'angeli", 'Grammofono', 'recorded before 1921'),
@@ -52,6 +57,7 @@ export const SAMPLES = [
     aria: 'Ai nostri monti ritorneremo', opera: 'Il trovatore', composer: 'Verdi',
     singer: 'Louise Homer', year: null, date: 'between 1900 and 1921', label: 'Gramophone',
     files: ['samples/alto.ogg', 'samples/alto.mp3'], voice: 'high',
+    analysisFiles: ['samples/alto.vocals.ogg', 'samples/alto.vocals.mp3'],
     license: LICENSE, licenseUrl: LICENSE_URL,
     source: 'https://commons.wikimedia.org/wiki/File:ICBSA_Verdi_-_Il_trovatore,_Ai_nostri_monti_ritorneremo.ogg',
     credit: credit('Louise Homer', 'contralto, with Enrico Caruso, tenor', 'Il trovatore', 'Ai nostri monti ritorneremo', 'Gramophone', 'recorded before 1921'),
@@ -62,6 +68,7 @@ export const SAMPLES = [
     aria: 'Stride la vampa', opera: 'Il trovatore', composer: 'Verdi',
     singer: 'Ebe Stignani', year: null, date: 'between 1939 and 1942', label: 'Cetra',
     files: ['samples/mezzo.ogg', 'samples/mezzo.mp3'], voice: 'high',
+    analysisFiles: ['samples/mezzo.vocals.ogg', 'samples/mezzo.vocals.mp3'],
     license: LICENSE, licenseUrl: LICENSE_URL,
     source: 'https://commons.wikimedia.org/wiki/File:ICBSA_Verdi_-_Il_trovatore,_Stride_la_vampa.ogg',
     credit: credit('Ebe Stignani', 'mezzo-soprano', 'Il trovatore', 'Stride la vampa', 'Cetra', '1939–1942'),
@@ -72,6 +79,7 @@ export const SAMPLES = [
     aria: 'Ave Maria', opera: 'Otello', composer: 'Verdi',
     singer: 'Rosa Ponselle', year: null, date: 'between 1900 and 1959', label: 'Grammofono',
     files: ['samples/soprano.ogg', 'samples/soprano.mp3'], voice: 'high',
+    analysisFiles: ['samples/soprano.vocals.ogg', 'samples/soprano.vocals.mp3'],
     license: LICENSE, licenseUrl: LICENSE_URL,
     source: 'https://commons.wikimedia.org/wiki/File:ICBSA_Verdi_-_Otello,_Ave_Maria.ogg',
     credit: credit('Rosa Ponselle', 'soprano', 'Otello', 'Ave Maria', 'Grammofono', 'recorded between 1900 and 1959'),

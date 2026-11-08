@@ -6,6 +6,8 @@ https://creativecommons.org/licenses/by-sa/4.0/
 
 **Changes made:** each file here is a short excerpt of the original recording. It was downmixed to mono, high-passed at 50 Hz, loudness-normalised (EBU R128, -18 LUFS), given 50 ms fade-in and fade-out so the clip loops cleanly, and re-encoded at 44.1 kHz / 96 kbps as Ogg Vorbis (`.ogg`) and MP3 (`.mp3`). These excerpts are adaptations, so they are also distributed under CC BY-SA 4.0.
 
+**Analysis stems:** for analysis only, the app uses an isolated-vocal stem (`<part>.vocals.ogg` / `<part>.vocals.mp3`) of each excerpt. It was made with Demucs (`htdemucs_ft`; Défossez et al., *Hybrid Transformers for Music Source Separation*, 2023; MIT-licensed model), is derived from the same CC BY-SA 4.0 excerpt, and is licensed CC BY-SA 4.0 too.
+
 Recording dates are given as recorded on Commons. Where Commons gives only a broad range for a Caruso recording, the upper bound is capped at 1921, the year of his death.
 
 | Part | Files | Excerpt of original |
