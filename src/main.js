@@ -3,13 +3,14 @@ import { tuningState, nearestStep, stepName, stepOctave } from './dsp/pitch.js';
 import { renderDemo } from './demo.js';
 import { VOICE_PRESETS, extraVowels, roundingPair, SOURCES } from './vowels.js';
 import { CalibrationUI, calibratedLandmarks } from './calibration.js';
+import { SynthUI } from './synth.js';
 import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter } from './ui/panels.js';
 
 const FFT = 4096;
 const PARAMS = new URLSearchParams(location.search);
 // Dev only: ?devtest autostarts the synthetic melody silently for visual QA
 // (?devtest=a sustains one vowel, for calibration QA).
-const MUTE_DEMO = PARAMS.has('devtest');
+const MUTE_DEMO = PARAMS.has('devtest') || PARAMS.has('devsynth'); // dev URLs are silent
 const $ = (id) => document.getElementById(id);
 const els = {
   landing: $('landing'), startBtn: $('startBtn'), error: $('errorMsg'),
@@ -73,6 +74,13 @@ calib = new CalibrationUI({
   ensureSession: async () => { if (!session) await start('mic'); return !!session; },
   onSaved: refreshLandmarks,
 });
+const synth = new SynthUI({
+  landmarks: () => landmarks,
+  f3For: (ipa) => (VOICE_PRESETS[voice].vowels.find((v) => v.ipa === ipa) || { f3: 2700 }).f3,
+  start: () => start('synth'),
+  stop: (toLanding) => stop(!toLanding),
+  isRunning: () => session?.mode === 'synth',
+});
 els.calReset.addEventListener('click', () => {
   try { localStorage.removeItem(`va.calib.${voice}`); } catch { /* ignore */ }
   refreshLandmarks();
@@ -83,6 +91,7 @@ setVoice(voice);
 
 async function start(mode) {
   els.error.hidden = true;
+  if (session) stop(true); // switching source (e.g. mic → synth)
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
     const analyser = ctx.createAnalyser();
@@ -90,7 +99,17 @@ async function start(mode) {
     analyser.smoothingTimeConstant = 0;
     session = { ctx, analyser, mode, analyzer: new Analyzer(ctx.sampleRate) };
 
-    if (mode === 'mic') {
+    if (mode === 'synth') {
+      await ctx.audioWorklet.addModule('src/synth-worklet.js');
+      const node = new AudioWorkletNode(ctx, 'formant-synth', { outputChannelCount: [1] });
+      node.connect(analyser);
+      if (!MUTE_DEMO) {
+        const out = ctx.createGain();
+        out.gain.value = 0.8;
+        node.connect(out).connect(ctx.destination);
+      }
+      session.synthNode = node;
+    } else if (mode === 'mic') {
       if (!navigator.mediaDevices?.getUserMedia) {
         throw Object.assign(new Error('insecure'), { name: 'InsecureContext' });
       }
@@ -106,7 +125,9 @@ async function start(mode) {
     els.landing.hidden = true;
     els.stopBtn.hidden = false;
     els.chip.hidden = false;
-    els.chip.textContent = mode === 'mic' ? 'Listening' : 'Dev synth';
+    els.chip.textContent = mode === 'mic' ? 'Listening' : mode === 'synth' ? 'Synthesizing' : 'Dev synth';
+    els.chip.classList.toggle('synth', mode === 'synth');
+    if (mode === 'synth') synth.attach(session.synthNode);
     resetHistory();
   } catch (err) {
     stop(true);
@@ -136,6 +157,7 @@ function startDemoSource(only = PARAMS.get('devtest') || undefined) {
 }
 
 function stop(silent) {
+  const wasSynth = session?.mode === 'synth';
   if (session) {
     session.stream?.getTracks().forEach((t) => t.stop());
     try { session.src?.stop(); } catch { /* noop */ }
@@ -145,6 +167,7 @@ function stop(silent) {
   if (!silent) els.landing.hidden = false;
   els.stopBtn.hidden = true;
   els.chip.hidden = true;
+  if (wasSynth) synth.detach();
 }
 
 function showError(err) {
@@ -164,6 +187,7 @@ function showError(err) {
 }
 
 els.startBtn.addEventListener('click', () => start('mic'));
+document.getElementById('synthBtn').addEventListener('click', () => synth.open());
 els.stopBtn.addEventListener('click', () => stop());
 
 /* ---------------- analysis + render loop ---------------- */
@@ -262,11 +286,12 @@ requestAnimationFrame(frame);
 
 // Never leave the demo voice playing in a background tab.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && session?.mode === 'demo') stop();
+  if (document.hidden && (session?.mode === 'demo' || session?.mode === 'synth')) stop();
 });
 
 // Autostart from URL (see MUTE_DEMO above).
 if (PARAMS.has('devtest')) start('demo');
+else if (PARAMS.has('devsynth')) synth.open();
 
 /* ---------------- help ---------------- */
 const help = document.getElementById('helpDialog');

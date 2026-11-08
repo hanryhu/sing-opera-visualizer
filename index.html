@@ -22,6 +22,7 @@
       <div class="toggles">
         <button class="toggle" id="detailToggle" aria-pressed="false" title="Show Hz values, grids and extra IPA vowels">Detail</button>
         <button class="toggle" id="quarterToggle" aria-pressed="false" title="Label quarter-tone pitches">¼ tones</button>
+        <button class="toggle" id="synthToggle" aria-pressed="false" title="Hear a synthesized voice with your own F0, F1, F2, F3 and volume">Synthesize</button>
         <button class="toggle" id="calibToggle" aria-pressed="false" title="Record your own vowels">Calibrate</button>
       </div>
       <div class="segmented" role="radiogroup" aria-label="Voice type">
@@ -67,6 +68,28 @@
     </section>
   </main>
 
+  <aside id="synthPanel" class="cal-panel synth-panel" hidden aria-label="Voice synthesizer">
+    <div class="cal-head">
+      <h2>Synthesizer</h2>
+      <button id="synthClose" class="icon-btn" aria-label="Close synthesizer">×</button>
+    </div>
+    <div class="synth-top">
+      <div id="synthVowels" class="cal-chips" aria-label="Vowel presets (load formants)"></div>
+      <div class="synth-actions">
+        <label class="check"><input id="synthVibrato" type="checkbox"> Vibrato</label>
+        <button id="synthPlay" class="btn btn-primary">Play</button>
+      </div>
+    </div>
+    <div class="synth-rows">
+      <label class="srow"><span>Pitch F0</span><input id="sMidi" type="range" min="36" max="84" step="1"><output id="oMidi"></output></label>
+      <label class="srow"><span>Volume</span><input id="sDb" type="range" min="-40" max="0" step="1"><output id="oDb"></output></label>
+      <span class="srow-spacer" aria-hidden="true"></span>
+      <label class="srow"><span>F1</span><input id="sF1" type="range" min="200" max="1200" step="5"><output id="oF1"></output></label>
+      <label class="srow"><span>F2</span><input id="sF2" type="range" min="500" max="3200" step="10"><output id="oF2"></output></label>
+      <label class="srow"><span>F3</span><input id="sF3" type="range" min="1800" max="4000" step="10"><output id="oF3"></output></label>
+    </div>
+  </aside>
+
   <aside id="calPanel" class="cal-panel" hidden aria-label="Vowel calibration">
     <div class="cal-head">
       <h2>Calibrate vowels</h2>
@@ -87,6 +110,7 @@
     </div>
   </aside>
 
+
   <dialog id="helpDialog" class="help" aria-labelledby="helpTitle">
     <div class="help-head">
       <h2 id="helpTitle">How to read the screen</h2>
@@ -105,6 +129,10 @@
       <p>Laid out like the IPA chart: front vowels left, close vowels top. Circles are the seven Italian vowels for
         your voice type, or your own after <i>Calibrate</i>. Above ~520 Hz (high soprano notes) the reading is
         approximate — the harmonics are too sparse to resolve formants.</p>
+      <h3>Synthesizer</h3>
+      <p>Plays a synthesized vowel with exactly the pitch (F0), formants (F1–F3) and volume you set, and runs it
+        through the analyzer. Use it to hear what a target vowel sounds like, or to check the displays against
+        known values. The vowel buttons load the current landmarks.</p>
       <h3>Input</h3>
       <p>Microphone level in dB relative to digital full scale (not SPL). Stay in the green; <i>CLIP</i> means the
         signal hit maximum and readings will be distorted.</p>
@@ -121,6 +149,7 @@
       <p>Live Pitch and Resonance visualizer</p>
       <div class="landing-actions">
         <button id="startBtn" class="btn btn-primary">Start analyzing</button>
+        <button id="synthBtn" class="btn btn-secondary">Synthesize a voice</button>
       </div>
       <p id="errorMsg" class="error" role="alert" hidden></p>
       <p class="fineprint">Audio data never leaves your device.</p>
