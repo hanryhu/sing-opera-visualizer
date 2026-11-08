@@ -641,6 +641,7 @@ export function drawVibrato(s, v, opts = {}) {
   const { w, h } = s;
   const [bLo, bHi] = opts.rateBand, best = opts.rateBest, [eLo, eHi] = opts.extentBand;
   const LO = 3.5, HI = 8.5, x0 = 10, x1 = w - 10, y = h - 13;
+  const tx = x1 - 18; // leave room for the hide (×) button in the top-right corner
   const xOf = (hz) => x0 + ((Math.max(LO, Math.min(HI, hz)) - LO) / (HI - LO)) * (x1 - x0);
   roundRect(ctx, 0.5, 0.5, w - 1, h - 1, 8);
   ctx.fillStyle = 'rgba(11,13,18,.72)'; ctx.fill();
@@ -659,8 +660,8 @@ export function drawVibrato(s, v, opts = {}) {
   }
 
   ctx.textAlign = 'right'; ctx.font = `600 11px ${C.ui}`;
-  if (!v) { ctx.fillStyle = C.faint; ctx.fillText('hold a note', x1, 12); return; }
-  if (!v.present) { ctx.fillStyle = C.muted; ctx.fillText('straight tone', x1, 12); return; }
+  if (!v) { ctx.fillStyle = C.faint; ctx.fillText('hold a note', tx, 12); return; }
+  if (!v.present) { ctx.fillStyle = C.muted; ctx.fillText('straight tone', tx, 12); return; }
 
   const rateWord = v.rate < bLo - 0.5 ? 'slow' : v.rate < bLo ? 'a little slow' : v.rate <= bHi ? 'typical'
     : v.rate <= bHi + 0.8 ? 'a little fast' : 'fast';
@@ -670,8 +671,8 @@ export function drawVibrato(s, v, opts = {}) {
   const txt = opts.detail
     ? `${v.rate.toFixed(1)} Hz · ±${Math.round(v.extent)}¢`
     : `${rateWord}${extWord ? ' · ' + extWord : ''}`;
-  ctx.fillStyle = col; ctx.fillText(txt, x1, 12);
-  if (opts.detail && extWord) { ctx.font = `500 10px ${C.ui}`; ctx.fillStyle = C.orange; ctx.fillText(extWord, x1 - ctx.measureText(txt).width - 30, 12); }
+  ctx.fillStyle = col; ctx.fillText(txt, tx, 12);
+  if (opts.detail && extWord) { ctx.font = `500 10px ${C.ui}`; ctx.fillStyle = C.orange; ctx.fillText(extWord, tx - ctx.measureText(txt).width - 30, 12); }
   // marker
   ctx.save();
   ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = inRate ? 8 : 0;

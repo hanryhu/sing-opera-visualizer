@@ -60,7 +60,7 @@
         <canvas id="gauge" class="gauge"></canvas>
         <label class="synth-inline synth-only" title="Synthesizer pitch (F0)"><span>F0</span><input id="iMidi" type="range" min="36" max="84" step="1"><output id="ioMidi"></output></label>
       </div>
-      <div class="fill"><canvas id="trace"></canvas><canvas id="vibcanvas" class="vibrato-box" aria-label="Vibrato rate and extent"></canvas></div>
+      <div class="fill"><canvas id="trace"></canvas><div id="vibWrap" class="vib-wrap"><canvas id="vibcanvas" class="vibrato-box" aria-label="Vibrato rate and extent"></canvas><button id="vibToggle" class="vib-toggle" aria-pressed="true" title="Hide vibrato" aria-label="Hide vibrato">×</button></div></div>
     </section>
 
     <section class="panel f3" data-panel="f3">

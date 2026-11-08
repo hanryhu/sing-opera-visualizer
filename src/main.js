@@ -432,6 +432,22 @@ let autoHist = [], lastAutoCheck = 0, pitchHist = [], vibHist = [], formantTrail
 const BASE_SPAN = 5, MAX_SPAN = 13; // semitones visible in the pitch trace (max ≈ an octave + margin)
 const ZOOM_HOLD = 10; // s to keep a zoomed-out view after it was last needed
 let lastVib = null; // last confident vibrato reading (bridges brief dropouts)
+// Vibrato box has its own hide/show inside the pitch panel (remembered)
+let vibHidden = store.get('va.vibHidden', '0') === '1';
+function applyVibHidden() {
+  const wrap = document.getElementById('vibWrap'), btn = document.getElementById('vibToggle');
+  wrap.classList.toggle('off', vibHidden);
+  btn.textContent = vibHidden ? 'VIBRATO' : '×';
+  btn.title = vibHidden ? 'Show vibrato' : 'Hide vibrato';
+  btn.setAttribute('aria-label', btn.title);
+  btn.setAttribute('aria-pressed', String(!vibHidden));
+}
+document.getElementById('vibToggle').addEventListener('click', () => {
+  vibHidden = !vibHidden;
+  store.set('va.vibHidden', vibHidden ? '1' : '0');
+  applyVibHidden();
+});
+applyVibHidden();
 let heldSpan = BASE_SPAN, lastWideT = -100, viewSpan = BASE_SPAN, lastDistortT = -10, lastFrameT = 0, viewCenter = 60, peakHold = -100, peakHoldT = 0, clipT = -10;
 function resetHistory() { pitchHist = []; vibHist = []; formantTrail = []; f3Trail = []; levelHist = []; lastPair = null; }
 
@@ -536,7 +552,7 @@ function render() {
   const vib = session ? analyzeVibrato(vibHist, now, 2048 / session.ctx.sampleRate) : null; // 2048-sample pitch window
   if (vib?.present) lastVib = { ...vib, t: now };
   const vibShown = vib && !vib.present && lastVib && now - lastVib.t < 0.4 ? lastVib : vib; // ride over brief dropouts
-  drawVibrato(surf.vib, vibShown, { detail: view.detail, rateBand: RATE_BAND, rateBest: RATE_BEST, extentBand: EXTENT_BAND });
+  if (!vibHidden) drawVibrato(surf.vib, vibShown, { detail: view.detail, rateBand: RATE_BAND, rateBest: RATE_BEST, extentBand: EXTENT_BAND });
 
   // ---- Formants ----
   const cur = o?.f1 && o?.f2 ? { f1: o.f1, f2: o.f2 } : null;
