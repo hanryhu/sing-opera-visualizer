@@ -6,8 +6,15 @@ import { estimateFormants, estimateFormantsHarmonic } from './formants.js';
 // Above this F0 the harmonics are too sparse for plain LPC; fit the harmonic peaks (DAP) instead.
 const DAP_F0 = 300;
 
+// Voicing gate. Loud-enough + reasonably periodic, OR quiet-but-very-clean (e.g. a whistle or a
+// soft note: a pure periodic tone is unmistakable even at low level, while room noise is never
+// periodic). Hysteresis: while a note is sounding, the level threshold drops so it doesn't flicker.
 const GATE_DB = -45;
+const QUIET_GATE_DB = -62;      // quiet path: needs very clean periodicity
+const QUIET_MAX_APERIODICITY = 0.08;
+const HYSTERESIS_DB = 8;        // once voiced, stay voiced down to GATE_DB - 8
 const MAX_APERIODICITY = 0.25;
+const QUIET_MIN_F0 = 70;        // keeps mains hum (50/60 Hz) out of the quiet path
 const VIBRATO_WINDOW = 0.45; // s — averaging window for the tuner decision
 const HOLD = 0.15; // s — keep tracks alive through short gaps
 
@@ -65,9 +72,12 @@ export class Analyzer {
       f0: 0, midiRaw: 0, midiMean: 0, f1: 0, f2: 0, f3: 0, ring: 0,
     };
 
-    if (rmsDb > GATE_DB) {
+    const wasVoiced = this.lastVoicedT >= 0 && t - this.lastVoicedT <= HOLD;
+    if (rmsDb > QUIET_GATE_DB) {
       const { f0, aperiodicity } = yin(frame.subarray(tail), this.sr);
-      if (f0 >= 60 && f0 <= 1500 && aperiodicity < MAX_APERIODICITY) {
+      const loudOk = rmsDb > GATE_DB - (wasVoiced ? HYSTERESIS_DB : 0) && aperiodicity < MAX_APERIODICITY;
+      const quietOk = aperiodicity < QUIET_MAX_APERIODICITY && f0 >= QUIET_MIN_F0;
+      if (f0 >= 60 && f0 <= 1500 && (loudOk || quietOk)) {
         out.voiced = true;
         // Remove the sharp bias from inharmonic sources (piano) by re-measuring on the low partials
         let midi = freqToMidi(refinePitch(frame.subarray(tail), this.sr, f0), this.a4);
