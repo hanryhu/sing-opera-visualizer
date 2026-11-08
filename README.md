@@ -1,4 +1,4 @@
-# Synsoph Vocal Analyzer (MVP)
+# Synsoph Vocal Analyzer
 
 Live pitch tuner, F3 / singer's-formant bar and Italian-vowel F1×F2 map for classical singers.
 Static site, no build step, no dependencies. See [DESIGN.md](DESIGN.md) for the full design.
@@ -15,6 +15,15 @@ Open http://localhost:5173 → **Start analyzing** (mic) or **Try demo voice** (
 
 The mic needs a secure context: `localhost` or HTTPS.
 
+## Modes (header toggles)
+
+- **Detail**: Hz/cents/dB readouts and grids on every panel, plus extra IPA landmarks (ə y ø œ ɪ ʊ ʌ ɑ æ).
+- **¼ tones**: quarter-tone steps (e.g. `A↑` = A quarter-sharp); in-tune band tightens to ±5¢.
+- **Calibrate**: record a e i o u (ɛ ɔ optional, else interpolated); saved per voice type in
+  localStorage and used instead of the default landmarks. "reset" on the map badge reverts.
+
+Dev: `?demo=a` sustains a single vowel; `window.__va.demo('e')` switches it (calibration QA).
+
 ## Layout
 
 ```
@@ -25,7 +34,8 @@ src/dsp/formants.js    decimation, LPC, root finding → F1/F2/F3
 src/dsp/analyzer.js    per-frame pipeline, smoothing, vibrato-averaged pitch
 src/ui/panels.js       canvas renderers (gauge, trace, F3 bar, vowel map, meter)
 src/demo.js            formant-synth demo singer
-src/vowels.js          landmark presets (high / low voice)
+src/vowels.js          landmark presets, extra IPA, calibration interpolation
+src/calibration.js     calibration panel + persistence
 ```
 
 ## Deploy (Vercel)

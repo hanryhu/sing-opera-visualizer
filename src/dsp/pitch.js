@@ -75,10 +75,23 @@ export function noteOctave(midi) {
   return Math.floor(Math.round(midi) / 12) - 1;
 }
 
-/** Coarse tuning state from deviation in cents. */
-export function tuningState(cents) {
+/** Coarse tuning state from deviation in cents (thresholds halve in quarter-tone mode). */
+export function tuningState(cents, quarter = false) {
   const a = Math.abs(cents);
-  if (a <= 10) return 'in';
-  if (a <= 30) return 'near';
+  const k = quarter ? 0.5 : 1;
+  if (a <= 10 * k) return 'in';
+  if (a <= 30 * k) return 'near';
   return 'off';
 }
+
+/** Nearest pitch step: semitone, or quarter tone when `quarter`. */
+export const nearestStep = (midi, quarter = false) =>
+  quarter ? Math.round(midi * 2) / 2 : Math.round(midi);
+
+/** Label for a (possibly quarter-tone) step, e.g. "A", "A#", "A↑" (A quarter-sharp). */
+export function stepName(step) {
+  const base = Math.floor(step + 1e-6);
+  const name = NOTE_NAMES[((base % 12) + 12) % 12];
+  return step - base > 0.25 ? name + '↑' : name;
+}
+export const stepOctave = (step) => Math.floor(Math.floor(step + 1e-6) / 12) - 1;

@@ -1,6 +1,6 @@
 # Synsoph Vocal Analyzer — Design Doc
 
-Status: draft v1 (2026-11-08) · MVP = Main UI only · Target host: Vercel (synsoph stack)
+Status: v1.1 (2026-11-08) · Main UI + Detailed UI + quarter tones + calibration implemented · Target host: Vercel (synsoph stack)
 
 ## 1. Goal
 

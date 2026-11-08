@@ -38,7 +38,10 @@ class Resonator {
  */
 export function renderDemo(fs, voice = 'low', opts = {}) {
   const preset = VOICE_PRESETS[voice];
-  const vowels = preset.vowels;
+  // opts.only: sustain a single vowel (used for testing calibration)
+  const vowels = opts.only
+    ? Array(7).fill(preset.vowels.find((v) => v.ipa === opts.only) || preset.vowels[3])
+    : preset.vowels;
   const seg = opts.segment ?? 1.8;
   // Melody (MIDI) — one note per vowel. Low: A3..E4, High: D4..A4
   // (kept in the middle voice: above ~500 Hz LPC formants become unreliable).

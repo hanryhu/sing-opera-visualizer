@@ -1,17 +1,21 @@
 import { Analyzer } from './dsp/analyzer.js';
-import { noteName, noteOctave, tuningState } from './dsp/pitch.js';
+import { tuningState, nearestStep, stepName, stepOctave } from './dsp/pitch.js';
 import { renderDemo } from './demo.js';
-import { VOICE_PRESETS } from './vowels.js';
+import { VOICE_PRESETS, extraVowels } from './vowels.js';
+import { CalibrationUI, calibratedLandmarks } from './calibration.js';
 import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter } from './ui/panels.js';
 
 const FFT = 4096;
-const MUTE_DEMO = new URLSearchParams(location.search).has('demo');
+const PARAMS = new URLSearchParams(location.search);
+const MUTE_DEMO = PARAMS.has('demo');
 const $ = (id) => document.getElementById(id);
 const els = {
   landing: $('landing'), startBtn: $('startBtn'), demoBtn: $('demoBtn'), error: $('errorMsg'),
   stopBtn: $('stopBtn'), chip: $('sourceChip'),
   noteBox: $('noteBox'), noteName: $('noteName'), noteOct: $('noteOct'), tuneState: $('tuneState'),
-  mapHint: $('mapHint'), clip: $('clipLamp'),
+  mapHint: $('mapHint'), clip: $('clipLamp'), detailReadout: $('detailReadout'),
+  detailToggle: $('detailToggle'), quarterToggle: $('quarterToggle'),
+  calBadge: $('calBadge'), calReset: $('calReset'),
 };
 const surf = {
   gauge: new Surface($('gauge')),
@@ -36,9 +40,41 @@ function setVoice(v) {
   document.querySelectorAll('.segmented button').forEach((b) =>
     b.setAttribute('aria-checked', String(b.dataset.voice === v)));
   if (session?.mode === 'demo') startDemoSource();
+  refreshLandmarks();
+  calib?.voiceChanged();
 }
 document.querySelectorAll('.segmented button').forEach((b) =>
   b.addEventListener('click', () => setVoice(b.dataset.voice)));
+
+// Display options
+const view = { detail: store.get('va.detail', '0') === '1', quarter: store.get('va.quarter', '0') === '1' };
+function bindToggle(btn, k) {
+  const sync = () => btn.setAttribute('aria-pressed', String(view[k]));
+  btn.addEventListener('click', () => { view[k] = !view[k]; store.set(`va.${k}`, view[k] ? '1' : '0'); sync(); });
+  sync();
+}
+bindToggle(els.detailToggle, 'detail');
+bindToggle(els.quarterToggle, 'quarter');
+
+// Landmarks: the singer's calibrated vowels replace the defaults
+let landmarks = VOICE_PRESETS[voice].vowels, isCalibrated = false;
+function refreshLandmarks() {
+  const cal = calibratedLandmarks(voice);
+  isCalibrated = !!cal;
+  landmarks = cal || VOICE_PRESETS[voice].vowels;
+  els.calBadge.hidden = !isCalibrated;
+}
+let calib = null;
+calib = new CalibrationUI({
+  getVoice: () => voice,
+  voiceLabel: (v) => VOICE_PRESETS[v].label,
+  ensureSession: async () => { if (!session) await start('mic'); return !!session; },
+  onSaved: refreshLandmarks,
+});
+els.calReset.addEventListener('click', () => {
+  try { localStorage.removeItem(`va.calib.${voice}`); } catch { /* ignore */ }
+  refreshLandmarks();
+});
 setVoice(voice);
 
 /* ---------------- audio session ---------------- */
@@ -76,10 +112,10 @@ async function start(mode) {
   }
 }
 
-function startDemoSource() {
+function startDemoSource(only = PARAMS.get('demo') || undefined) {
   const { ctx, analyser } = session;
   if (session.src) { try { session.src.stop(); } catch { /* already stopped */ } }
-  const demo = renderDemo(ctx.sampleRate, voice);
+  const demo = renderDemo(ctx.sampleRate, voice, { only });
   const buf = ctx.createBuffer(1, demo.samples.length, ctx.sampleRate);
   buf.copyToChannel(demo.samples, 0);
   const src = ctx.createBufferSource();
@@ -133,7 +169,7 @@ els.stopBtn.addEventListener('click', () => stop());
 const timeBuf = new Float32Array(FFT);
 const specBuf = new Float32Array(FFT / 2);
 let pitchHist = [], formantTrail = [], f3Trail = [];
-let viewCenter = 60, peakHold = -100, peakHoldT = 0, clipT = -10;
+let lastFrameT = 0, viewCenter = 60, peakHold = -100, peakHoldT = 0, clipT = -10;
 function resetHistory() { pitchHist = []; formantTrail = []; f3Trail = []; }
 
 function readFrame(now) {
@@ -159,33 +195,40 @@ function frame() {
   if (session) {
     const spec = readFrame(now);
     o = session.analyzer.process(timeBuf, spec, now);
-    window.__va = { o, ctxState: session.ctx.state };
+    window.__va = { o, ctxState: session.ctx.state, demo: (v) => startDemoSource(v) };
   }
 
   // ---- Tuner ----
   let state = null, cents = null, rawCents = null;
   if (o?.tracking) {
-    const nearest = Math.round(o.midiMean);
+    const nearest = nearestStep(o.midiMean, view.quarter);
     cents = (o.midiMean - nearest) * 100;
-    state = tuningState(cents);
+    state = tuningState(cents, view.quarter);
     rawCents = o.voiced ? (o.midiRaw - nearest) * 100 : null;
-    els.noteName.textContent = noteName(nearest);
-    els.noteOct.textContent = noteOctave(nearest);
+    els.noteName.textContent = stepName(nearest);
+    els.noteOct.textContent = stepOctave(nearest);
     els.noteBox.className = 'note ' + state;
     els.tuneState.textContent = state === 'in' ? 'in tune'
       : state === 'near' ? (cents > 0 ? 'a little sharp' : 'a little flat')
       : 'between notes';
-    viewCenter += (nearest - viewCenter) * 0.15;
+    // Time-based easing (frame-rate independent); snap on big leaps
+    const dt = Math.min(0.5, now - (lastFrameT || now));
+    if (Math.abs(nearest - viewCenter) > 3) viewCenter = nearest;
+    else viewCenter += (nearest - viewCenter) * (1 - Math.exp(-dt / 0.08));
+    els.detailReadout.textContent = `${cents >= 0 ? '+' : '−'}${Math.abs(cents).toFixed(0)}¢ · ${o.f0 ? o.f0.toFixed(1) + ' Hz' : ''}`;
   } else {
+    els.detailReadout.textContent = '';
     els.noteName.textContent = '–';
     els.noteOct.textContent = '';
     els.noteBox.className = 'note';
     els.tuneState.textContent = session ? 'sing a note' : '';
   }
+  lastFrameT = now;
   if (o?.voiced) pitchHist.push({ t: now, midi: o.midiRaw, mean: o.midiMean, state });
   prune(pitchHist, now, 5);
-  drawGauge(surf.gauge, cents, rawCents, state);
-  drawTrace(surf.trace, pitchHist, now, viewCenter);
+  els.detailReadout.hidden = !view.detail;
+  drawGauge(surf.gauge, cents, rawCents, state, view);
+  drawTrace(surf.trace, pitchHist, now, viewCenter, view);
 
   // ---- Formants ----
   const cur = o?.f1 && o?.f2 ? { f1: o.f1, f2: o.f2 } : null;
@@ -195,8 +238,12 @@ function frame() {
   prune(f3Trail, now, 1.3);
   const uncertain = !!(o?.f0 && o.f0 > 520);
   els.mapHint.hidden = !(cur && uncertain);
-  drawVowelMap(surf.map, VOICE_PRESETS[voice].vowels, cur, formantTrail, now, { uncertain });
-  drawF3(surf.f3, o?.f3 || 0, f3Trail, o?.ring || 0, now);
+  drawVowelMap(surf.map, landmarks, cur, formantTrail, now, {
+    uncertain, detail: view.detail, calibrated: isCalibrated,
+    extras: view.detail ? extraVowels(voice) : [],
+  });
+  drawF3(surf.f3, o?.f3 || 0, f3Trail, o?.ring || 0, now, view);
+  calib.tick(o, now);
 
   // ---- Level ----
   const rms = o ? o.rmsDb : -100;
@@ -204,7 +251,7 @@ function frame() {
   else if (now - peakHoldT > 1) peakHold -= 0.6;
   if (o?.clipped) clipT = now;
   els.clip.classList.toggle('on', now - clipT < 1.5);
-  drawMeter(surf.meter, rms, peakHold);
+  drawMeter(surf.meter, rms, peakHold, view);
 }
 requestAnimationFrame(frame);
 

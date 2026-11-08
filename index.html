@@ -19,9 +19,14 @@
       <span class="brand-app">Vocal Analyzer</span>
     </div>
     <div class="controls">
+      <div class="toggles">
+        <button class="toggle" id="detailToggle" aria-pressed="false" title="Show Hz values, grids and extra IPA vowels">Detail</button>
+        <button class="toggle" id="quarterToggle" aria-pressed="false" title="Label quarter-tone pitches">¼ tones</button>
+        <button class="toggle" id="calibToggle" aria-pressed="false" title="Record your own vowels">Calibrate</button>
+      </div>
       <div class="segmented" role="radiogroup" aria-label="Voice type">
-        <button role="radio" data-voice="high" title="Soprano · mezzo · countertenor">High voice</button>
-        <button role="radio" data-voice="low" title="Tenor · baritone · bass">Low voice</button>
+        <button role="radio" data-voice="high" aria-label="High voice" title="Soprano · mezzo · countertenor">High voice</button>
+        <button role="radio" data-voice="low" aria-label="Low voice" title="Tenor · baritone · bass">Low voice</button>
       </div>
       <span id="sourceChip" class="chip" hidden></span>
       <button id="stopBtn" class="btn btn-ghost" hidden>Stop</button>
@@ -36,6 +41,7 @@
           <span id="noteName">–</span><span id="noteOct" class="oct"></span>
         </div>
         <div id="tuneState" class="tune-state">sing a note</div>
+        <div id="detailReadout" class="detail-readout" hidden></div>
         <canvas id="gauge" class="gauge"></canvas>
       </div>
       <div class="fill"><canvas id="trace"></canvas></div>
@@ -50,6 +56,7 @@
       <div class="panel-label">Vowel <span class="muted">· F1 × F2</span></div>
       <canvas id="mapcanvas"></canvas>
       <div id="mapHint" class="map-hint" hidden>High pitch — vowel reading is approximate</div>
+      <div id="calBadge" class="cal-badge" hidden>Your vowels <button id="calReset" class="linkish">reset</button></div>
     </section>
 
     <section class="panel meter">
@@ -58,6 +65,26 @@
       <div id="clipLamp" class="clip">CLIP</div>
     </section>
   </main>
+
+  <aside id="calPanel" class="cal-panel" hidden aria-label="Vowel calibration">
+    <div class="cal-head">
+      <h2>Calibrate vowels</h2>
+      <button id="calClose" class="icon-btn" aria-label="Close calibration">×</button>
+    </div>
+    <p class="cal-intro">Sing each vowel on a comfortable, sustained note for 3 seconds. Your vowels replace the
+      default landmarks for <b id="calVoice">Low voice</b>. ɛ and ɔ are optional.</p>
+    <div id="calChips" class="cal-chips" role="tablist" aria-label="Vowels"></div>
+    <div class="cal-stage">
+      <div class="cal-target"><span id="calVowel">a</span><small id="calExample">as in “casa”</small></div>
+      <button id="calRecord" class="btn btn-primary">Record</button>
+    </div>
+    <div class="cal-progress"><div id="calBar"></div></div>
+    <p id="calMsg" class="cal-msg" aria-live="polite"></p>
+    <div class="cal-actions">
+      <button id="calSave" class="btn btn-secondary" disabled>Save &amp; use</button>
+      <button id="calDefaults" class="btn btn-ghost">Use defaults</button>
+    </div>
+  </aside>
 
   <div id="landing" class="landing">
     <div class="landing-card">

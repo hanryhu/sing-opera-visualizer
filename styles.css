@@ -43,7 +43,7 @@ body {
 }
 .brand-sep { color: var(--faint); font-weight: 400; }
 .brand-app { color: var(--muted); font-weight: 500; }
-.controls { display: flex; align-items: center; gap: 10px; }
+.controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .controls button, .chip { white-space: nowrap; }
 
 .segmented {
@@ -185,4 +185,69 @@ body {
   .meter .panel-label { width: 56px; padding-left: 12px; }
   .landing-card { padding: 24px; }
   .landing h1 { font-size: 23px; }
+}
+
+/* ---------- toggles ---------- */
+.toggles { display: inline-flex; gap: 6px; }
+.toggle {
+  font: 500 13px var(--ui); color: var(--muted); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 9px; padding: 6px 11px; cursor: pointer;
+}
+.toggle:hover { color: var(--text); border-color: var(--line-strong); }
+.toggle[aria-pressed="true"] { color: var(--accent); border-color: rgba(124, 196, 255, .45); background: rgba(124, 196, 255, .08); }
+.toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.detail-readout { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; height: 16px; }
+.detail-readout[hidden] { display: none; }
+
+/* ---------- calibration ---------- */
+.cal-badge {
+  position: absolute; top: 8px; right: 12px; z-index: 2; font-size: 11px; font-weight: 600;
+  color: var(--accent); background: rgba(124, 196, 255, .08); border: 1px solid rgba(124, 196, 255, .3);
+  padding: 3px 10px; border-radius: 999px;
+}
+.cal-badge[hidden] { display: none; }
+.linkish { font: inherit; color: var(--muted); background: none; border: 0; padding: 0 0 0 4px; cursor: pointer; text-decoration: underline; }
+.linkish:hover { color: var(--text); }
+
+.cal-panel {
+  position: fixed; right: 20px; top: 66px; z-index: 8; width: 340px; max-width: calc(100vw - 32px);
+  background: var(--panel-2); border: 1px solid var(--line-strong); border-radius: 16px; padding: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
+}
+.cal-panel[hidden] { display: none; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; }
+.cal-head h2 { font-size: 16px; margin: 0; }
+.icon-btn { background: none; border: 0; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+.icon-btn:hover { color: var(--text); background: var(--line); }
+.cal-intro { color: var(--muted); font-size: 13px; margin: 8px 0 12px; }
+.cal-intro b { color: var(--text); font-weight: 600; }
+.cal-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.cal-chip {
+  font: 400 18px var(--ipa); width: 38px; height: 38px; border-radius: 10px; cursor: pointer;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line-strong); position: relative;
+}
+.cal-chip.optional { color: var(--muted); }
+.cal-chip[aria-selected="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.cal-chip.done::after {
+  content: '✓'; position: absolute; top: -6px; right: -6px; font: 700 10px var(--ui); color: #04150b;
+  background: var(--green); border-radius: 50%; width: 15px; height: 15px; display: grid; place-items: center;
+}
+.cal-stage { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cal-target { display: flex; align-items: baseline; gap: 10px; }
+.cal-target span { font: 400 44px/1 var(--ipa); color: var(--accent); }
+.cal-target small { color: var(--muted); font-size: 12px; }
+.cal-progress { height: 4px; background: var(--track, #1b2130); border-radius: 2px; margin: 14px 0 8px; overflow: hidden; }
+.cal-progress div { height: 100%; width: 0; background: var(--green); }
+.cal-msg { font-size: 12px; color: var(--muted); min-height: 18px; margin: 0 0 12px; }
+.cal-msg.bad { color: var(--orange); }
+.cal-actions { display: flex; gap: 8px; }
+.cal-actions .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+@media (max-width: 760px) {
+  .toggle { padding: 6px 9px; font-size: 12px; }
+  .cal-panel { right: 16px; left: 16px; top: auto; bottom: 16px; width: auto; }
+  .cal-badge { top: auto; bottom: 6px; right: 50%; transform: translateX(50%); white-space: nowrap; }
+  .controls { gap: 8px; }
+  .controls .chip { display: none; }
 }
