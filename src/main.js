@@ -6,7 +6,7 @@ import { CalibrationUI, calibratedLandmarks } from './calibration.js';
 import { SynthUI } from './synth.js';
 import { SamplesUI, loadSamples, pickFile } from './sampleplayer.js';
 import { FeedbackRecorder } from './feedback.js';
-import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter } from './ui/panels.js';
+import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter, mapGeometry, f3Geometry } from './ui/panels.js';
 
 const FFT = 4096;
 const PARAMS = new URLSearchParams(location.search);
@@ -88,6 +88,28 @@ const synth = new SynthUI({
   stop: () => stop(),
   isRunning: () => session?.mode === 'synth',
 });
+// Synthesize mode: drag on the vowel map (sets F1 + F2) or the F3 bar (sets F3)
+function dragControl(canvas, toParams) {
+  let active = false;
+  const apply = (e) => {
+    const r = canvas.getBoundingClientRect();
+    synth.set(toParams(e.clientX - r.left, e.clientY - r.top, r.width, r.height));
+  };
+  canvas.addEventListener('pointerdown', (e) => {
+    if (session?.mode !== 'synth') return;
+    active = true; try { canvas.setPointerCapture(e.pointerId); } catch { /* not all pointers capture */ } apply(e); e.preventDefault();
+  });
+  canvas.addEventListener('pointermove', (e) => { if (active) apply(e); });
+  const end = () => { active = false; };
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
+}
+dragControl(document.getElementById('mapcanvas'), (x, y, w, h) => {
+  const g = mapGeometry(w, h, view.detail);
+  return { f1: g.f1At(y), f2: g.f2At(x) };
+});
+dragControl(document.getElementById('f3canvas'), (_x, y, w, h) => ({ f3: f3Geometry(w, h).fAt(y) }));
+
 let samplesUI = null;
 loadSamples().then((list) => {
   samplesUI = new SamplesUI(list, {
@@ -195,6 +217,7 @@ async function start(mode, sample) {
       : mode === 'sample' ? `Playing · ${sample.part}` : 'Dev synth';
     els.chip.classList.toggle('synth', mode === 'synth');
     if (mode === 'synth') synth.attach(session.synthNode);
+    document.body.classList.toggle('synth-on', mode === 'synth'); // shows the inline synth controls
     resetHistory();
   } catch (err) {
     stop();
@@ -236,6 +259,7 @@ function stop() { // never returns to the landing page
   els.stopBtn.hidden = true;
   els.chip.hidden = true;
   if (wasSynth) synth.detach();
+  document.body.classList.remove('synth-on');
 }
 
 function showError(err) {
@@ -419,12 +443,14 @@ function render() {
     ? 'Too loud — input is clipping, vowel reading paused. Lower mic level or step back.'
     : 'High pitch: closed vowels (i, u, e, o) read as more open';
   els.mapHint.hidden = !(cur && uncertain);
+  const synthOn = session?.mode === 'synth';
   drawVowelMap(surf.map, shown, cur, formantTrail, now, {
     uncertain, detail: view.detail, calibrated: isCalibrated, f0: sungF0,
+    target: synthOn ? { f1: synth.state.f1, f2: synth.state.f2 } : null,
     extras: view.detail ? extraVowels(voice) : [],
   });
   if (cur && o.voiced) lastPair = roundingPair(cur.f1, cur.f2, shown) || lastPair;
-  drawF3(surf.f3, o?.f3 || 0, f3Trail, o?.ring || 0, now, { ...view, pair: lastPair });
+  drawF3(surf.f3, o?.f3 || 0, f3Trail, o?.ring || 0, now, { ...view, pair: lastPair, target: synthOn ? synth.state.f3 : 0 });
   calib.tick(o, now);
 
   // ---- Level ----

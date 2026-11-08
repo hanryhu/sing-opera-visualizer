@@ -50,17 +50,18 @@
         <div id="tuneState" class="tune-state">sing a note</div>
         <div id="detailReadout" class="detail-readout" hidden></div>
         <canvas id="gauge" class="gauge"></canvas>
+        <label class="synth-inline synth-only" title="Synthesizer pitch (F0)"><span>F0</span><input id="iMidi" type="range" min="36" max="84" step="1"><output id="ioMidi"></output></label>
       </div>
       <div class="fill"><canvas id="trace"></canvas></div>
     </section>
 
     <section class="panel f3">
-      <div class="panel-label">F3 <span class="muted">· ring</span></div>
+      <div class="panel-label">F3 <span class="muted">· ring</span><span class="synth-only drag-hint">drag bar to set</span></div>
       <canvas id="f3canvas"></canvas>
     </section>
 
     <section class="panel vowels">
-      <div class="panel-label">Vowel <span class="muted">· F1 × F2</span></div>
+      <div class="panel-label">Vowel <span class="muted">· F1 × F2</span><span class="synth-only drag-hint">drag to set F1 · F2</span></div>
       <canvas id="mapcanvas"></canvas>
       <div id="mapHint" class="map-hint" hidden>High pitch: closed vowels (i, u, e, o) read as more open</div>
       <div class="vowel-tools">
@@ -72,6 +73,7 @@
     <section class="panel meter">
       <div class="panel-label">Input</div>
       <div class="fill"><canvas id="metercanvas"></canvas></div>
+      <label class="synth-inline synth-only meter-vol" title="Synthesizer volume"><span>Volume</span><input id="iDb" type="range" min="-40" max="0" step="1"><output id="ioDb"></output></label>
       <div id="clipLamp" class="clip">CLIP</div>
     </section>
   </main>

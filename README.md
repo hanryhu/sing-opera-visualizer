@@ -24,6 +24,12 @@ The mic needs a secure context: `localhost` or HTTPS.
 
 Dev: `?devtest` runs the synthetic melody (vibrato, tuning errors) silently; `?devtest=a` sustains a single vowel; `window.__va.demo('e')` switches it (calibration QA).
 
+## Synthesize
+
+Plays a formant-synthesized vowel through the analyzer. Set it from the dialog (draggable on desktop, remembers its
+place) or directly on the dashboard: F0 slider under the tuner, drag on the F3 bar, drag on the vowel map (F1 + F2),
+Volume slider in the Input panel. The set values show as a diamond (F3) and crosshair (F1/F2) next to what's measured.
+
 ## Recording
 
 **● Record** (header) saves up to 30 s of the dashboard as a video (`sing-record-<time>.webm`) with the exact sound the

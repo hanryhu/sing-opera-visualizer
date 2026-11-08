@@ -23,15 +23,19 @@ export class SynthUI {
       midi: $('sMidi'), f1: $('sF1'), f2: $('sF2'), f3: $('sF3'), db: $('sDb'),
     };
     this.out = { midi: $('oMidi'), f1: $('oF1'), f2: $('oF2'), f3: $('oF3'), db: $('oDb') };
+    // Inline dashboard controls (shown only while synthesizing) mirror the dialog
+    this.inline = { midi: $('iMidi'), db: $('iDb') };
+    this.inlineOut = { midi: $('ioMidi'), db: $('ioDb') };
     this.node = null;
 
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { /* ignore */ }
     this.state = { ...DEFAULTS, ...saved };
 
-    for (const [k, input] of Object.entries(this.sliders)) {
-      input.addEventListener('input', () => { this.state[k] = Number(input.value); this.apply(); });
+    for (const [k, input] of [...Object.entries(this.sliders), ...Object.entries(this.inline)]) {
+      input?.addEventListener('input', () => this.set({ [k]: Number(input.value) }));
     }
+    this.makeDraggable();
     this.el.vib.addEventListener('change', () => { this.state.vibrato = this.el.vib.checked; this.apply(); });
         this.el.close.addEventListener('click', () => this.close());
     this.el.play.addEventListener('click', () => (this.h.isRunning() ? this.h.stop() : this.h.start()));
@@ -46,12 +50,62 @@ export class SynthUI {
     this.render();
   }
 
+  /** Set one or more parameters (from the dialog, the inline sliders, or dragging on the map / F3 bar). */
+  set(partial) {
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const lim = { midi: [36, 84], f1: [200, 1200], f2: [500, 3200], f3: [1800, 4000], db: [-40, 0] };
+    for (const [k, v] of Object.entries(partial)) {
+      if (lim[k]) this.state[k] = Math.round(clamp(v, ...lim[k]));
+      else this.state[k] = v;
+    }
+    if (this.state.f2 < this.state.f1 + 100) this.state.f2 = Math.min(3200, this.state.f1 + 100); // keep F2 above F1
+    this.apply();
+  }
+
+  /** Drag the dialog by its title bar (desktop); remembers where it was left. */
+  makeDraggable() {
+    const panel = this.el.panel, head = panel.querySelector('.cal-head');
+    const POS = 'va.synthPos';
+    const place = (x, y) => {
+      const r = panel.getBoundingClientRect();
+      const nx = Math.max(8, Math.min(innerWidth - r.width - 8, x));
+      const ny = Math.max(8, Math.min(innerHeight - 40, y));
+      Object.assign(panel.style, { left: `${nx}px`, top: `${ny}px`, right: 'auto', bottom: 'auto' });
+      return [nx, ny];
+    };
+    const desktop = () => matchMedia('(min-width: 761px)').matches;
+    this.restorePos = () => {
+      if (!desktop()) { Object.assign(panel.style, { left: '', top: '', right: '', bottom: '' }); return; }
+      try { const p = JSON.parse(localStorage.getItem(POS) || 'null'); if (p) place(p[0], p[1]); } catch { /* ignore */ }
+    };
+    let drag = null;
+    head.addEventListener('pointerdown', (e) => {
+      if (!desktop() || e.target.closest('button')) return;
+      const r = panel.getBoundingClientRect();
+      drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+      try { head.setPointerCapture(e.pointerId); } catch { /* not all pointers capture */ }
+      panel.classList.add('dragging');
+    });
+    head.addEventListener('pointermove', (e) => { if (drag) place(e.clientX - drag.dx, e.clientY - drag.dy); });
+    const end = () => {
+      if (!drag) return;
+      drag = null;
+      panel.classList.remove('dragging');
+      const r = panel.getBoundingClientRect();
+      try { localStorage.setItem(POS, JSON.stringify([r.left, r.top])); } catch { /* ignore */ }
+    };
+    head.addEventListener('pointerup', end);
+    head.addEventListener('pointercancel', end);
+    addEventListener('resize', () => this.restorePos());
+  }
+
   /** Called by main when a synth session starts / ends. */
   attach(node) { this.node = node; this.apply(); this.renderPlay(); }
   detach() { this.node = null; this.renderPlay(); }
 
   open() {
     this.el.panel.hidden = false;
+    this.restorePos?.();
     this.el.toggle?.setAttribute('aria-pressed', 'true');
     this.render();
     if (!this.h.isRunning()) this.h.start();
@@ -86,6 +140,9 @@ export class SynthUI {
     this.out.f2.textContent = `${s.f2} Hz`;
     this.out.f3.textContent = `${s.f3} Hz`;
     this.out.db.textContent = s.db <= -40 ? 'muted' : `${s.db} dB`;
+    for (const [k, input] of Object.entries(this.inline)) if (input && document.activeElement !== input) input.value = String(s[k]);
+    if (this.inlineOut.midi) this.inlineOut.midi.textContent = this.out.midi.textContent;
+    if (this.inlineOut.db) this.inlineOut.db.textContent = this.out.db.textContent;
     this.el.chips.innerHTML = this.h.landmarks().map((v) => {
       const on = Math.abs(v.f1 - s.f1) < 2 && Math.abs(v.f2 - s.f2) < 2;
       return `<button class="cal-chip" data-ipa="${v.ipa}" aria-pressed="${on}" title="Set F1/F2/F3 to [${v.ipa}]">${v.ipa}</button>`;

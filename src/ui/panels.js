@@ -173,16 +173,23 @@ export function drawTrace(s, hist, now, centerMidi, opts = {}) {
 /* F3 bar                                                              */
 /* ------------------------------------------------------------------ */
 const F3_LO = 1800, F3_HI = 4000;
-export function drawF3(s, f3, trail, ring, now, opts = {}) {
-  const ctx = s.begin();
-  const { w, h } = s;
+/** F3 bar layout shared by the renderer and pointer input (CSS px of the canvas). */
+export function f3Geometry(w, h) {
   const ringH = 46;
   const wide = w >= 220;
-  const pair = opts.pair; // {unrounded, rounded} for the current tongue position
   const barW = Math.min(40, w * 0.3);
   const bx = wide ? Math.round(w * 0.36 - barW / 2) : (w - barW) / 2;
   const barTop = wide ? 40 : 86, barBot = h - (wide ? ringH + 12 : 56 + ringH);
-  const yOf = (f) => barBot - (Math.log(f / F3_LO) / Math.log(F3_HI / F3_LO)) * (barBot - barTop);
+  const k = Math.log(F3_HI / F3_LO);
+  const yOf = (f) => barBot - (Math.log(f / F3_LO) / k) * (barBot - barTop);
+  const fAt = (y) => F3_LO * Math.exp(((barBot - Math.max(barTop, Math.min(barBot, y))) / (barBot - barTop)) * k);
+  return { ringH, wide, barW, bx, barTop, barBot, yOf, fAt };
+}
+export function drawF3(s, f3, trail, ring, now, opts = {}) {
+  const ctx = s.begin();
+  const { w, h } = s;
+  const pair = opts.pair; // {unrounded, rounded} for the current tongue position
+  const { ringH, wide, barW, bx, barTop, barBot, yOf } = f3Geometry(w, h);
 
   // Rounding labels: the unrounded/rounded pair for the vowel being sung
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
@@ -241,6 +248,17 @@ export function drawF3(s, f3, trail, ring, now, opts = {}) {
     ctx.fillRect(bx - 4, yOf(p.f3) - 0.75, barW + 8, 1.5);
   }
 
+  // Synth target (what you set): a diamond on the left edge of the bar + a dashed guide
+  if (opts.target) {
+    const y = Math.max(barTop, Math.min(barBot, yOf(opts.target)));
+    ctx.save();
+    ctx.setLineDash([3, 3]); ctx.strokeStyle = rgba(C.accent, 0.8); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(bx - 4, y); ctx.lineTo(bx + barW + 4, y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = C.accent;
+    ctx.beginPath(); ctx.moveTo(bx - 16, y); ctx.lineTo(bx - 9, y - 7); ctx.lineTo(bx - 2, y); ctx.lineTo(bx - 9, y + 7); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
   // Pointer
   if (f3) {
     const y = Math.max(barTop, Math.min(barBot, yOf(f3)));
@@ -285,14 +303,22 @@ export function drawF3(s, f3, trail, ring, now, opts = {}) {
 /* Vowel map: F2 (x, reversed) × F1 (y)                                */
 /* ------------------------------------------------------------------ */
 const F2_HI = 3200, F2_LO = 580, F1_LO = 220, F1_HI = 1200;
+/** Vowel-map layout shared by the renderer and pointer input (CSS px of the canvas). */
+export function mapGeometry(w, h, detail) {
+  const D = !!detail;
+  const compact = h < 300; // short panel (laptop thirds layout): tighter margins
+  const L = 44, R = D ? 40 : 24, T = compact ? 36 : D ? 62 : 44, B = compact && D ? 40 : compact ? 30 : 36;
+  const kx = Math.log(F2_HI / F2_LO), ky = Math.log(F1_HI / F1_LO);
+  const xOf = (f2) => L + (Math.log(F2_HI / f2) / kx) * (w - L - R);
+  const yOf = (f1) => T + (Math.log(f1 / F1_LO) / ky) * (h - T - B);
+  const f2At = (x) => F2_HI / Math.exp(((x - L) / (w - L - R)) * kx);
+  const f1At = (y) => F1_LO * Math.exp(((y - T) / (h - T - B)) * ky);
+  return { D, compact, L, R, T, B, xOf, yOf, f2At, f1At };
+}
 export function drawVowelMap(s, vowels, cur, trail, now, opts = {}) {
   const ctx = s.begin();
   const { w, h } = s;
-  const D = !!opts.detail;
-  const compact = h < 300; // short panel (laptop thirds layout): tighter margins
-  const L = 44, R = D ? 40 : 24, T = compact ? 36 : D ? 62 : 44, B = compact && D ? 40 : compact ? 30 : 36;
-  const xOf = (f2) => L + (Math.log(F2_HI / f2) / Math.log(F2_HI / F2_LO)) * (w - L - R);
-  const yOf = (f1) => T + (Math.log(f1 / F1_LO) / Math.log(F1_HI / F1_LO)) * (h - T - B);
+  const { D, compact, L, R, T, B, xOf, yOf } = mapGeometry(w, h, opts.detail);
 
   // Plot area + soft grid
   roundRect(ctx, L - 10, T - 10, w - L - R + 20, h - T - B + 20, 12);
@@ -426,6 +452,22 @@ export function drawVowelMap(s, vowels, cur, trail, now, opts = {}) {
       ctx.beginPath(); ctx.moveTo(xOf(prev.f2), yOf(prev.f1)); ctx.lineTo(xOf(p.f2), yOf(p.f1)); ctx.stroke();
     }
     prev = p;
+  }
+
+  // Synth target (what you set): crosshair; drag on the map to move it
+  if (opts.target) {
+    const x = xOf(opts.target.f2), y = yOf(opts.target.f1);
+    ctx.save();
+    ctx.strokeStyle = C.accent; ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(x, T - 10); ctx.lineTo(x, h - B + 10); ctx.moveTo(L - 10, y); ctx.lineTo(w - R + 10, y);
+    ctx.globalAlpha = 0.35; ctx.stroke(); ctx.globalAlpha = 1; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - 17, y); ctx.lineTo(x - 7, y); ctx.moveTo(x + 7, y); ctx.lineTo(x + 17, y);
+    ctx.moveTo(x, y - 17); ctx.lineTo(x, y - 7); ctx.moveTo(x, y + 7); ctx.lineTo(x, y + 17); ctx.stroke();
+    ctx.font = `600 10px ${C.ui}`; ctx.fillStyle = C.accent; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillText(D ? `set ${Math.round(opts.target.f1)} / ${Math.round(opts.target.f2)}` : 'set', x + 14, y - 10);
+    ctx.restore();
   }
 
   // Current vowel

@@ -345,3 +345,28 @@ body {
 .feedback-panel { width: 400px; }
 .feedback-panel a { color: var(--accent); }
 @media (max-width: 760px) { .feedback-panel { width: auto; position: static; margin: 0 16px 16px; box-shadow: none; } }
+
+/* ---------- synthesizer: inline dashboard controls ---------- */
+.synth-only { display: none !important; }
+body.synth-on .synth-only { display: flex !important; }
+body.synth-on .drag-hint { display: inline !important; }
+.drag-hint { margin-left: 8px; color: var(--accent); font-weight: 600; text-transform: none; letter-spacing: 0; }
+.synth-inline { align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: var(--accent); }
+.synth-inline input[type="range"] { accent-color: var(--accent); }
+.synth-inline output { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+.tuner-readout .synth-inline { width: 100%; max-width: 260px; margin-top: 4px; }
+.tuner-readout .synth-inline input { flex: 1; min-width: 0; }
+.tuner-readout .synth-inline output { width: 96px; text-align: right; }
+.meter-vol { position: absolute; top: 6px; right: 80px; z-index: 2; }
+.meter-vol input { width: 160px; }
+.meter-vol output { width: 52px; text-align: right; }
+body.synth-on #mapcanvas, body.synth-on #f3canvas { cursor: crosshair; touch-action: none; }
+/* draggable synth dialog */
+.synth-panel .cal-head { cursor: grab; user-select: none; touch-action: none; }
+.synth-panel.dragging .cal-head { cursor: grabbing; }
+@media (max-width: 760px) {
+  .synth-panel .cal-head { cursor: default; }
+  body.synth-on .f3 .drag-hint { display: none !important; } /* too narrow on phones */
+  .meter-vol { right: 64px; }
+  .meter-vol input { width: 110px; }
+}
