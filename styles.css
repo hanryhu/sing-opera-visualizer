@@ -374,3 +374,50 @@ body.synth-on #mapcanvas, body.synth-on #f3canvas { cursor: crosshair; touch-act
 /* ---------- vibrato indicator (top-right of the pitch trace) ---------- */
 .fill > canvas.vibrato-box { position: absolute; inset: auto; top: 8px; right: 10px; width: 230px; height: 44px; pointer-events: none; }
 @media (max-width: 760px) { .fill > canvas.vibrato-box { width: 180px; } }
+
+/* ---------- header v3: live dot, icon buttons, settings menu, exit ---------- */
+.mode-switch button { display: inline-flex; align-items: center; gap: 6px; }
+.live-dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: var(--red); animation: pulse 1.6s infinite; }
+body[data-live="mic"] .mode-switch button[data-mode="mic"] .live-dot { display: inline-block; }
+body[data-live="synth"] .mode-switch button[data-mode="synth"] .live-dot { display: inline-block; background: var(--accent); }
+body[data-live="listen"] .mode-switch button[data-mode="listen"] .live-dot { display: inline-block; background: var(--accent); }
+.icon-toggle { display: inline-grid; place-items: center; width: 34px; height: 32px; padding: 0; }
+.exit-btn:hover { color: #fff; border-color: var(--red); background: rgba(255, 77, 94, .15); }
+.settings-wrap { position: relative; }
+.settings-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: 270px;
+  background: var(--panel-2); border: 1px solid var(--line-strong); border-radius: 14px; padding: 12px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
+}
+.sm-title { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 2px 2px 8px; }
+.sm-voice { display: flex; width: 100%; }
+.sm-voice button { flex: 1; }
+.sm-note { font-size: 12px; color: var(--faint); margin: 6px 2px 0; min-height: 16px; }
+.sm-sep { height: 1px; background: var(--line); margin: 10px -12px; }
+.sm-row {
+  display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px;
+  background: none; border: 0; color: var(--text); font: 500 13px var(--ui); padding: 8px 6px; border-radius: 8px; cursor: pointer; text-align: left;
+}
+.sm-row:hover { background: var(--line); }
+.sm-row small { color: var(--faint); font-weight: 400; }
+.switch { position: relative; width: 32px; height: 18px; border-radius: 999px; background: var(--line-strong); flex: none; transition: background .15s; }
+.switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #cfd5e1; transition: transform .15s; }
+.sm-row[aria-pressed="true"] .switch { background: var(--accent); }
+.sm-row[aria-pressed="true"] .switch::after { transform: translateX(14px); background: #fff; }
+
+/* ---------- collapsible panels ---------- */
+.panel-label { display: flex; align-items: center; gap: 6px; }
+.collapse-btn {
+  pointer-events: auto; display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: -4px;
+  border: 0; border-radius: 5px; background: none; color: var(--muted); cursor: pointer; padding: 0; transition: transform .15s;
+}
+.collapse-btn:hover { color: var(--text); background: var(--line); }
+.panel.collapsed .collapse-btn { transform: rotate(-90deg); }
+.panel.collapsed > :not(.panel-label) { display: none !important; }
+.panel.collapsed { min-height: 0; }
+.panel.collapsed .panel-label .drag-hint { display: none !important; }
+.meter .panel-label { position: absolute; }
+@media (max-width: 760px) {
+  /* full-width sheet under the gear button (its top is set from the button position in JS) */
+  .settings-menu { position: fixed; left: 16px; right: 16px; width: auto; }
+}

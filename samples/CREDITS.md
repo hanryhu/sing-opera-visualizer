@@ -15,7 +15,6 @@ Recording dates are given as recorded on Commons. Where Commons gives only a bro
 | Bass | `bass.ogg`, `bass.mp3` | 1:52.2–2:15.2 |
 | Baritone | `baritone.ogg`, `baritone.mp3` | 0:21.8–0:47.6 |
 | Tenor | `tenor.ogg`, `tenor.mp3` | 1:22.7–1:46.3 |
-| Alto (contralto) | `alto.ogg`, `alto.mp3` | 1:01.7–1:30.7 |
 | Mezzo-soprano | `mezzo.ogg`, `mezzo.mp3` | 0:06.7–0:28.2 |
 | Soprano | `soprano.ogg`, `soprano.mp3` | 0:52.8–1:21.6 |
 
@@ -47,15 +46,6 @@ Recording dates are given as recorded on Commons. Where Commons gives only a bro
 - **Licence:** CC BY-SA 4.0
 - **Source:** https://commons.wikimedia.org/wiki/File:ICBSA_Verdi_-_La_forza_del_destino,_O_tu_che_in_seno_agl'angeli.ogg
 - **Excerpt:** 1:22.7–1:46.3 of the original (start of the aria, after the recitative), converted to mono
-
-## Alto (contralto): `alto.ogg` / `alto.mp3`
-- **Work:** Giuseppe Verdi, *Il trovatore*, "Ai nostri monti ritorneremo" (libretto by S. Cammarano and L. E. Bardare)
-- **Performers:** Louise Homer (contralto), with Enrico Caruso (tenor)
-- **Recorded:** before 1921 (Commons: between 1900 and 1959), Gramophone
-- **Archive:** ICBSA, record ID IT-DDS0000054239000100
-- **Licence:** CC BY-SA 4.0
-- **Source:** https://commons.wikimedia.org/wiki/File:ICBSA_Verdi_-_Il_trovatore,_Ai_nostri_monti_ritorneremo.ogg
-- **Excerpt:** 1:01.7–1:30.7 of the original, converted to mono. This is Azucena's solo statement of the melody, before the tenor enters.
 
 ## Mezzo-soprano: `mezzo.ogg` / `mezzo.mp3`
 - **Work:** Giuseppe Verdi, *Il trovatore*, "Stride la vampa" (libretto by S. Cammarano and L. E. Bardare)

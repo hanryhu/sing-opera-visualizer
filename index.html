@@ -20,29 +20,37 @@
     </div>
     <div class="controls">
       <div class="segmented mode-switch" role="radiogroup" aria-label="Sound source">
-        <button role="radio" data-mode="mic" aria-checked="false" title="Analyze your voice from the microphone">Sing</button>
-        <button role="radio" data-mode="synth" aria-checked="false" title="Hear a synthesized voice with your own F0, F1, F2, F3 and volume">Synthesize</button>
-        <button role="radio" data-mode="listen" aria-checked="false" title="Listen to aria excerpts for each voice part">Listen</button>
+        <button role="radio" data-mode="mic" aria-checked="false" title="Analyze your voice from the microphone"><span class="live-dot" aria-hidden="true"></span>Sing</button>
+        <button role="radio" data-mode="synth" aria-checked="false" title="Hear a synthesized voice with your own F0, F1, F2, F3 and volume"><span class="live-dot" aria-hidden="true"></span>Synthesize</button>
+        <button role="radio" data-mode="listen" aria-checked="false" title="Listen to aria excerpts for each voice part"><span class="live-dot" aria-hidden="true"></span>Listen</button>
       </div>
-      <div class="toggles">
-        <button class="toggle" id="detailToggle" aria-pressed="false" title="Show Hz values, grids and extra IPA vowels">Detail</button>
-        <button class="toggle" id="quarterToggle" aria-pressed="false" title="Label quarter-tone pitches">¼ tones</button>
-        <button class="toggle" id="calibToggle" aria-pressed="false" title="Record your own vowels">Calibrate</button>
-      </div>
-      <div class="segmented" role="radiogroup" aria-label="Voice type">
-        <button role="radio" data-voice="high" aria-label="High voice" title="Soprano · mezzo · countertenor">High voice</button>
-        <button role="radio" data-voice="low" aria-label="Low voice" title="Tenor · baritone · bass">Low voice</button>
-      </div>
-      <span id="sourceChip" class="chip" hidden></span>
+      <button class="toggle" id="detailToggle" aria-pressed="false" title="Show Hz values, grids and extra IPA vowels">Detail</button>
       <button id="feedbackBtn" class="toggle feedback-btn" title="Record up to 30 s of the dashboard and sound as a video">● Record</button>
-      <button id="helpBtn" class="toggle help-btn" aria-label="Help and sources" title="Help and sources">?</button>
-      <button id="stopBtn" class="btn btn-ghost" hidden>Stop</button>
+      <div class="settings-wrap">
+        <button id="settingsBtn" class="toggle icon-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="settingsMenu" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6a.5.5 0 0 0 .1-.6l-1.9-3.3a.5.5 0 0 0-.6-.2l-2.4 1a7.4 7.4 0 0 0-1.7-1L14.5 2.7a.5.5 0 0 0-.5-.4h-3.8a.5.5 0 0 0-.5.4L9.4 5.3a7.4 7.4 0 0 0-1.7 1l-2.4-1a.5.5 0 0 0-.6.2L2.8 8.8a.5.5 0 0 0 .1.6L4.9 11a7.6 7.6 0 0 0 0 2l-2 1.6a.5.5 0 0 0-.1.6l1.9 3.3c.1.2.4.3.6.2l2.4-1c.5.4 1.1.7 1.7 1l.4 2.6c0 .2.3.4.5.4h3.8c.2 0 .5-.2.5-.4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.4 1c.2.1.5 0 .6-.2l1.9-3.3a.5.5 0 0 0-.1-.6L19.4 13ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg></button>
+        <div id="settingsMenu" class="settings-menu" hidden>
+          <div class="sm-title">Voice range</div>
+          <div class="segmented sm-voice" role="radiogroup" aria-label="Voice range">
+            <button role="radio" data-voicemode="auto" aria-checked="true" title="Detect from the pitches you sing">Auto</button>
+            <button role="radio" data-voicemode="high" aria-checked="false" title="Soprano · mezzo · alto · countertenor">High</button>
+            <button role="radio" data-voicemode="low" aria-checked="false" title="Tenor · baritone · bass">Low</button>
+          </div>
+          <div id="voiceDetected" class="sm-note"></div>
+          <div class="sm-sep"></div>
+          <button class="sm-row" id="quarterToggle" aria-pressed="false" title="Label quarter-tone pitches"><span>Quarter tones</span><span class="switch" aria-hidden="true"></span></button>
+          <button class="sm-row" id="pitchAwareToggle" aria-pressed="true" title="Move vowel circles with the sung pitch, the way trained singers tune their resonances"><span>Follow pitch <small>(vowel circles)</small></span><span class="switch" aria-hidden="true"></span></button>
+          <div class="sm-sep"></div>
+          <button class="sm-row" id="calibToggle" aria-pressed="false"><span>Calibrate vowels…</span></button>
+          <button class="sm-row" id="helpBtn"><span>Help &amp; sources…</span></button>
+        </div>
+      </div>
+      <button id="exitBtn" class="toggle icon-toggle exit-btn" aria-label="Exit to start page" title="Exit (stop and return to the start page)"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h7M13 3l5 2v14l-5 2V3Z"/><circle cx="15.2" cy="12" r="0.9" fill="currentColor"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M9 12H2.5m2.5-2.5L2.5 12 5 14.5"/></svg></button>
     </div>
   </header>
 
   <main id="dashboard" class="dashboard" aria-live="off">
-    <section class="panel tuner">
-      <div class="panel-label">Pitch</div>
+    <section class="panel tuner" data-panel="pitch">
+      <div class="panel-label"><button class="collapse-btn" aria-expanded="true" title="Hide panel" aria-label="Hide panel"><svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>Pitch</div>
       <div class="tuner-readout">
         <div class="note" id="noteBox">
           <span id="noteName">–</span><span id="noteOct" class="oct"></span>
@@ -55,26 +63,25 @@
       <div class="fill"><canvas id="trace"></canvas><canvas id="vibcanvas" class="vibrato-box" aria-label="Vibrato rate and extent"></canvas></div>
     </section>
 
-    <section class="panel f3">
-      <div class="panel-label">F3 <span class="muted">· ring</span><span class="synth-only drag-hint">drag bar to set</span></div>
+    <section class="panel f3" data-panel="f3">
+      <div class="panel-label"><button class="collapse-btn" aria-expanded="true" title="Hide panel" aria-label="Hide panel"><svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>F3 <span class="muted">· singer's formant</span><span class="synth-only drag-hint">drag bar to set</span></div>
       <canvas id="f3canvas"></canvas>
     </section>
 
-    <section class="panel vowels">
-      <div class="panel-label">Vowel <span class="muted">· F1 × F2</span><span class="synth-only drag-hint">drag to set F1 · F2</span></div>
+    <section class="panel vowels" data-panel="vowel">
+      <div class="panel-label"><button class="collapse-btn" aria-expanded="true" title="Hide panel" aria-label="Hide panel"><svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>Vowel <span class="muted">· F1 × F2</span><span class="synth-only drag-hint">drag to set F1 · F2</span></div>
       <canvas id="mapcanvas"></canvas>
       <div id="mapHint" class="map-hint" hidden>High pitch: closed vowels (i, u, e, o) read as more open</div>
       <div class="vowel-tools">
         <div id="calBadge" class="cal-badge" hidden>Your vowels <button id="calReset" class="linkish">reset</button></div>
-        <button id="pitchAwareToggle" class="toggle mini" aria-pressed="true" title="Move vowel circles with the sung pitch, the way trained singers tune their resonances (see ? for sources)">Follow pitch</button>
       </div>
     </section>
 
-    <section class="panel meter">
-      <div class="panel-label">Input</div>
+    <section class="panel meter" data-panel="input">
+      <div class="panel-label"><button class="collapse-btn" aria-expanded="true" title="Hide panel" aria-label="Hide panel"><svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>Input</div>
       <div class="fill"><canvas id="metercanvas"></canvas></div>
       <label class="synth-inline synth-only meter-vol" title="Synthesizer volume"><span>Volume</span><input id="iDb" type="range" min="-40" max="0" step="1"><output id="ioDb"></output></label>
-      <div id="clipLamp" class="clip">CLIP</div>
+      <div id="clipLamp" class="clip" hidden title="The input hit full scale: the sound is distorted. Lower the mic level or step back.">CLIP</div>
     </section>
   </main>
 
@@ -148,10 +155,11 @@
         (Prame 1997); very wide vibrato was rated less appropriate. Rates naturally speed up near the end of a note.
         No study we found prescribes vibrato rate by tempo — very short notes simply don't last long enough for a
         full cycle (≈0.17 s at 6 Hz).</p>
-      <h3>F3 · ring</h3>
-      <p>The third formant. Lip rounding lowers it, so the pointer moves toward <i>rounded</i>. The labels show the
-        unrounded/rounded pair for the vowel you're singing (e.g. ʌ / ɔ). The green zone around 3 kHz is where trained
-        singers cluster F3–F5 into the singer's formant.</p>
+      <h3>F3 · singer's formant</h3>
+      <p>The pointer is the third formant (F3). Lip rounding lowers it, so it moves toward <i>rounded</i>; the labels
+        show the unrounded/rounded pair for the vowel you're singing (e.g. ʌ / ɔ). F3 is <i>not</i> the same thing as
+        "ring": every voice has an F3. Ring is the <b>singer's formant</b> — F3, F4 and F5 pulled together into one strong
+        peak around 2.5–3.2 kHz (Sundberg 1974); the green zone marks that region.</p>
       <p><i>RING</i> measures that singer's formant the way Sundberg (1995) proposed: how much stronger the 3 kHz region
         is than an ordinary speaking voice would have <i>for the same vowel</i> (every vowel has some energy there —
         far more in [i] than in [u] — so a plain ratio would mostly report the vowel). <b>0 dB</b> ≈ speech-like;

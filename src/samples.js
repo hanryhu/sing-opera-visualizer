@@ -53,17 +53,6 @@ export const SAMPLES = [
     excerpt: '1:22.7–1:46.3 of original (23.6 s loop)',
   },
   {
-    id: 'alto', part: 'Alto',
-    aria: 'Ai nostri monti ritorneremo', opera: 'Il trovatore', composer: 'Verdi',
-    singer: 'Louise Homer', year: null, date: 'between 1900 and 1921', label: 'Gramophone',
-    files: ['samples/alto.ogg', 'samples/alto.mp3'], voice: 'high',
-    analysisFiles: ['samples/alto.vocals.ogg', 'samples/alto.vocals.mp3'],
-    license: LICENSE, licenseUrl: LICENSE_URL,
-    source: 'https://commons.wikimedia.org/wiki/File:ICBSA_Verdi_-_Il_trovatore,_Ai_nostri_monti_ritorneremo.ogg',
-    credit: credit('Louise Homer', 'contralto, with Enrico Caruso, tenor', 'Il trovatore', 'Ai nostri monti ritorneremo', 'Gramophone', 'recorded before 1921'),
-    excerpt: "1:01.7–1:30.7 of original (29.0 s loop; Azucena alone, before the tenor enters)",
-  },
-  {
     id: 'mezzo', part: 'Mezzo-soprano',
     aria: 'Stride la vampa', opera: 'Il trovatore', composer: 'Verdi',
     singer: 'Ebe Stignani', year: null, date: 'between 1939 and 1942', label: 'Cetra',

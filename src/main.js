@@ -17,7 +17,7 @@ const MUTE_DEMO = ['devtest', 'devsynth', 'devsample', 'mute'].some((k) => PARAM
 const $ = (id) => document.getElementById(id);
 const els = {
   landing: $('landing'), error: $('errorMsg'), toast: $('toast'),
-  stopBtn: $('stopBtn'), chip: $('sourceChip'),
+  exitBtn: $('exitBtn'), settingsBtn: $('settingsBtn'), settingsMenu: $('settingsMenu'), voiceDetected: $('voiceDetected'),
   noteBox: $('noteBox'), noteName: $('noteName'), noteOct: $('noteOct'), tuneState: $('tuneState'),
   mapHint: $('mapHint'), clip: $('clipLamp'), detailReadout: $('detailReadout'),
   detailToggle: $('detailToggle'), quarterToggle: $('quarterToggle'),
@@ -39,19 +39,36 @@ const store = {
   get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* ignore */ } },
 };
-let voice = store.get('va.voice', 'low');
+// Voice range: Auto (default — detected from the pitches you sing) or a fixed High / Low preset.
+let voiceMode = store.get('va.voiceMode', 'auto');
+if (!['auto', 'high', 'low'].includes(voiceMode)) voiceMode = 'auto';
+let voice = voiceMode === 'auto' ? store.get('va.voiceAuto', 'low') : voiceMode;
 if (!VOICE_PRESETS[voice]) voice = 'low';
+let autoNote = '';
+/** Set the effective voice preset (landmarks, synth/sample defaults). */
 function setVoice(v) {
   voice = v;
-  store.set('va.voice', v);
-  document.querySelectorAll('button[data-voice]').forEach((b) =>
-    b.setAttribute('aria-checked', String(b.dataset.voice === v)));
+  if (voiceMode === 'auto') store.set('va.voiceAuto', v);
   if (session?.mode === 'demo') startDemoSource();
   refreshLandmarks();
   calib?.voiceChanged();
+  updateVoiceUI();
 }
-document.querySelectorAll('button[data-voice]').forEach((b) =>
-  b.addEventListener('click', () => setVoice(b.dataset.voice)));
+function setVoiceMode(m) {
+  voiceMode = m;
+  store.set('va.voiceMode', m);
+  setVoice(m === 'auto' ? store.get('va.voiceAuto', voice) : m);
+}
+function updateVoiceUI() {
+  document.querySelectorAll('button[data-voicemode]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.voicemode === voiceMode)));
+  if (els.voiceDetected) {
+    els.voiceDetected.textContent = voiceMode === 'auto'
+      ? `Using ${voice === 'high' ? 'High' : 'Low'} voice${autoNote ? ` — your typical pitch ${autoNote}` : ' — sing to detect'}`
+      : VOICE_PRESETS[voice].hint;
+  }
+}
+document.querySelectorAll('button[data-voicemode]').forEach((b) =>
+  b.addEventListener('click', () => setVoiceMode(b.dataset.voicemode)));
 
 // Display options
 const view = {
@@ -216,11 +233,8 @@ async function start(mode, sample) {
     }
     await ctx.resume().catch(() => {});
     els.landing.hidden = true;
-    els.stopBtn.hidden = false;
-    els.chip.hidden = false;
-    els.chip.textContent = mode === 'mic' ? 'Listening' : mode === 'synth' ? 'Synthesizing'
-      : mode === 'sample' ? `Playing · ${sample.part}` : 'Dev synth';
-    els.chip.classList.toggle('synth', mode === 'synth');
+    // Live dot on the active source button (replaces the old status chip)
+    document.body.dataset.live = mode === 'mic' ? 'mic' : mode === 'synth' ? 'synth' : mode === 'sample' ? 'listen' : '';
     if (mode === 'synth') synth.attach(session.synthNode);
     document.body.classList.toggle('synth-on', mode === 'synth'); // shows the inline synth controls
     resetHistory();
@@ -271,8 +285,7 @@ function stop() { // never returns to the landing page
     }
   }
   session = null;
-  els.stopBtn.hidden = true;
-  els.chip.hidden = true;
+  delete document.body.dataset.live;
   if (wasSynth) synth.detach();
   document.body.classList.remove('synth-on');
 }
@@ -344,12 +357,78 @@ feedback = new FeedbackRecorder({
 document.getElementById('synthClose').addEventListener('click', () => setSourceMode(null));
 document.getElementById('samplesClose').addEventListener('click', () => setSourceMode(null));
 
-els.stopBtn.addEventListener('click', () => { stop(); samplesUI?.render(); });
+// Exit: stop everything and go back to the start page
+els.exitBtn.addEventListener('click', () => {
+  if (feedback?.recording) feedback.stop();
+  if (!document.getElementById('synthPanel').hidden) synth.close();
+  if (samplesUI && !document.getElementById('samplesPanel').hidden) samplesUI.close();
+  if (!document.getElementById('calPanel').hidden) calib.close();
+  stop();
+  setSourceMode(null);
+  closeSettings();
+  els.landing.hidden = false;
+});
+
+// Settings menu: voice range, quarter tones, follow pitch, calibrate, help
+function closeSettings() { els.settingsMenu.hidden = true; els.settingsBtn.setAttribute('aria-expanded', 'false'); }
+els.settingsBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const open = els.settingsMenu.hidden;
+  els.settingsMenu.hidden = !open;
+  els.settingsBtn.setAttribute('aria-expanded', String(open));
+  if (open) {
+    updateVoiceUI();
+    // Phones: the menu is a fixed full-width sheet; place it just under the gear button
+    els.settingsMenu.style.top = matchMedia('(max-width: 760px)').matches ? `${els.settingsBtn.getBoundingClientRect().bottom + 8}px` : '';
+  }
+});
+document.addEventListener('click', (e) => { if (!els.settingsMenu.hidden && !e.target.closest('.settings-wrap')) closeSettings(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSettings(); });
+for (const id of ['calibToggle', 'helpBtn']) document.getElementById(id).addEventListener('click', closeSettings);
+
+// Collapsible panels (remembered). The grid is rebuilt so the open panels share the space.
+let collapsed = {};
+try { collapsed = JSON.parse(store.get('va.collapsed', '{}')) || {}; } catch { collapsed = {}; }
+function applyLayout() {
+  const dash = document.getElementById('dashboard');
+  const c = (k) => !!collapsed[k];
+  document.querySelectorAll('#dashboard .panel[data-panel]').forEach((p) => {
+    const on = c(p.dataset.panel);
+    p.classList.toggle('collapsed', on);
+    const btn = p.querySelector('.collapse-btn');
+    btn.setAttribute('aria-expanded', String(!on));
+    btn.title = on ? 'Show panel' : 'Hide panel';
+    btn.setAttribute('aria-label', btn.title);
+  });
+  const mobile = matchMedia('(max-width: 760px)').matches;
+  const H = '38px', grow = 'minmax(0, 1fr)';
+  const rows = [], areas = [];
+  const add = (r, a) => { rows.push(r); areas.push(a); };
+  add(c('pitch') ? H : mobile ? 'auto' : grow, '"tuner tuner"');
+  const mid = mobile ? '400px' : grow;
+  if (c('f3') && c('vowel')) add(H, '"f3 map"');
+  else if (c('f3')) { add(H, '"f3 f3"'); add(mid, '"map map"'); }
+  else if (c('vowel')) { add(H, '"map map"'); add(mid, '"f3 f3"'); }
+  else add(mid, '"f3 map"');
+  add(c('input') ? H : mobile ? '150px' : grow, '"meter meter"');
+  dash.style.gridTemplateRows = rows.join(' ');
+  dash.style.gridTemplateAreas = areas.join(' ');
+}
+document.querySelectorAll('#dashboard .panel[data-panel] .collapse-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const k = btn.closest('.panel').dataset.panel;
+    collapsed[k] = !collapsed[k];
+    store.set('va.collapsed', JSON.stringify(collapsed));
+    applyLayout();
+  });
+});
+matchMedia('(max-width: 760px)').addEventListener('change', applyLayout);
+applyLayout();
 
 /* ---------------- analysis + render loop ---------------- */
 const timeBuf = new Float32Array(FFT);
 const specBuf = new Float32Array(FFT / 2);
-let pitchHist = [], vibHist = [], formantTrail = [], f3Trail = [], levelHist = [], lastPair = null;
+let autoHist = [], lastAutoCheck = 0, pitchHist = [], vibHist = [], formantTrail = [], f3Trail = [], levelHist = [], lastPair = null;
 const BASE_SPAN = 5, MAX_SPAN = 13; // semitones visible in the pitch trace (max ≈ an octave + margin)
 const ZOOM_HOLD = 10; // s to keep a zoomed-out view after it was last needed
 let lastVib = null; // last confident vibrato reading (bridges brief dropouts)
@@ -433,6 +512,20 @@ function render() {
   }
   lastFrameT = now;
   if (o?.voiced) pitchHist.push({ t: now, midi: o.midiRaw, mean: o.midiMean, state });
+  // Auto voice range: typical (median) sung pitch over the last 20 s of singing, with hysteresis.
+  // Low voices (tenor/baritone/bass) rarely centre above E4; high voices (alto-soprano) rarely below F#4.
+  if (voiceMode === 'auto' && session?.mode === 'mic' && o?.tracking) {
+    autoHist.push({ t: now, m: o.midiMean });
+    while (autoHist.length && now - autoHist[0].t > 20) autoHist.shift();
+    if (autoHist.length > 90 && now - lastAutoCheck > 0.5) {
+      lastAutoCheck = now;
+      const ms = autoHist.map((p) => p.m).sort((a, b) => a - b);
+      const med = ms[ms.length >> 1];
+      autoNote = `${stepName(Math.round(med))}${stepOctave(Math.round(med))}`;
+      const target = med < 63.5 ? 'low' : med > 65.5 ? 'high' : voice;
+      if (target !== voice) setVoice(target); else updateVoiceUI();
+    }
+  }
   prune(pitchHist, now, 5);
   els.detailReadout.hidden = !view.detail;
   drawGauge(surf.gauge, cents, rawCents, state, view);
@@ -477,7 +570,9 @@ function render() {
   if (o && o.peakDb > peakHold) { peakHold = o.peakDb; peakHoldT = now; }
   else if (now - peakHoldT > 1) peakHold -= 0.6;
   if (o?.clipped) clipT = now;
-  els.clip.classList.toggle('on', now - clipT < 1.5);
+  const clipping = now - clipT < 2; // CLIP appears only when the input actually clipped recently
+  els.clip.hidden = !clipping;
+  els.clip.classList.toggle('on', clipping);
   if (o) levelHist.push({ t: now, db: o.rmsDb, clip: o.clipped });
   prune(levelHist, now, 8.5);
   drawMeter(surf.meter, rms, peakHold, view, levelHist, now);
