@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vocal Analyzer · Synsoph</title>
+  <meta name="description" content="Live pitch, vowel and singer's-formant feedback for classical singers.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">Synsoph</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-app">Vocal Analyzer</span>
+    </div>
+    <div class="controls">
+      <div class="segmented" role="radiogroup" aria-label="Voice type">
+        <button role="radio" data-voice="high" title="Soprano · mezzo · countertenor">High voice</button>
+        <button role="radio" data-voice="low" title="Tenor · baritone · bass">Low voice</button>
+      </div>
+      <span id="sourceChip" class="chip" hidden></span>
+      <button id="stopBtn" class="btn btn-ghost" hidden>Stop</button>
+    </div>
+  </header>
+
+  <main id="dashboard" class="dashboard" aria-live="off">
+    <section class="panel tuner">
+      <div class="panel-label">Pitch</div>
+      <div class="tuner-readout">
+        <div class="note" id="noteBox">
+          <span id="noteName">–</span><span id="noteOct" class="oct"></span>
+        </div>
+        <div id="tuneState" class="tune-state">sing a note</div>
+        <canvas id="gauge" class="gauge"></canvas>
+      </div>
+      <div class="fill"><canvas id="trace"></canvas></div>
+    </section>
+
+    <section class="panel f3">
+      <div class="panel-label">F3 <span class="muted">· ring</span></div>
+      <canvas id="f3canvas"></canvas>
+    </section>
+
+    <section class="panel vowels">
+      <div class="panel-label">Vowel <span class="muted">· F1 × F2</span></div>
+      <canvas id="mapcanvas"></canvas>
+      <div id="mapHint" class="map-hint" hidden>High pitch — vowel reading is approximate</div>
+    </section>
+
+    <section class="panel meter">
+      <div class="panel-label">Input</div>
+      <div class="fill"><canvas id="metercanvas"></canvas></div>
+      <div id="clipLamp" class="clip">CLIP</div>
+    </section>
+  </main>
+
+  <div id="landing" class="landing">
+    <div class="landing-card">
+      <div class="landing-kicker">Live voice feedback</div>
+      <h1>See your pitch, vowel and ring as you sing.</h1>
+      <p>Sustain a note into your microphone. The tuner shows how centred you are, the vowel map shows where your
+        vowel sits among the Italian vowels, and the F3 bar shows rounding and singer's-formant ring.</p>
+      <div class="landing-actions">
+        <button id="startBtn" class="btn btn-primary">Start analyzing</button>
+        <button id="demoBtn" class="btn btn-secondary">Try demo voice</button>
+      </div>
+      <p id="errorMsg" class="error" role="alert" hidden></p>
+      <p class="fineprint">Audio is analysed on this device and never uploaded. For best results use headphones
+        and an external or headset mic.</p>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
