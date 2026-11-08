@@ -5,6 +5,7 @@ import { VOICE_PRESETS, extraVowels, roundingPair, SOURCES, pitchAdjustedLandmar
 import { CalibrationUI, calibratedLandmarks } from './calibration.js';
 import { SynthUI } from './synth.js';
 import { SamplesUI, loadSamples, pickFile } from './sampleplayer.js';
+import { FeedbackRecorder } from './feedback.js';
 import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter } from './ui/panels.js';
 
 const FFT = 4096;
@@ -115,7 +116,10 @@ async function start(mode, sample) {
     const analyser = ctx.createAnalyser();
     analyser.fftSize = FFT;
     analyser.smoothingTimeConstant = 0;
-    const me = { ctx, analyser, mode, analyzer: new Analyzer(ctx.sampleRate) };
+    // Every source feeds the analyzer through one tap, so the feedback recorder hears exactly the same signal
+    const tap = ctx.createGain();
+    tap.connect(analyser);
+    const me = { ctx, analyser, tap, mode, analyzer: new Analyzer(ctx.sampleRate) };
     session = me;
     // Loading is async; if the session is stopped meanwhile (tab hidden, another source), abandon quietly.
     const cancelled = () => { if (session === me) return false; ctx.close().catch(() => {}); return true; };
@@ -144,12 +148,12 @@ async function start(mode, sample) {
         ana = ctx.createBufferSource();
         ana.buffer = anaBuf;
         ana.loop = true;
-        ana.connect(analyser);
+        ana.connect(tap);
       } else {
         // Fallback: band-limit the original to the voice range before analysis
         const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 100;
         const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5000;
-        src.connect(hp).connect(lp).connect(analyser);
+        src.connect(hp).connect(lp).connect(tap);
       }
       src.onended = () => { if (session?.src === src) { stop(); samplesUI?.render(); } };
       const t0 = ctx.currentTime + 0.05; // same clock tick for both → sample-aligned
@@ -163,7 +167,7 @@ async function start(mode, sample) {
       await ctx.audioWorklet.addModule('src/synth-worklet.js');
       if (cancelled()) return;
       const node = new AudioWorkletNode(ctx, 'formant-synth', { outputChannelCount: [1] });
-      node.connect(analyser);
+      node.connect(tap);
       if (!MUTE_DEMO) {
         const out = ctx.createGain();
         out.gain.value = 0.8;
@@ -179,7 +183,7 @@ async function start(mode, sample) {
       });
       if (cancelled()) { stream.getTracks().forEach((t) => t.stop()); return; }
       session.stream = stream;
-      ctx.createMediaStreamSource(stream).connect(analyser);
+      ctx.createMediaStreamSource(stream).connect(tap);
     } else {
       startDemoSource();
     }
@@ -199,7 +203,7 @@ async function start(mode, sample) {
 }
 
 function startDemoSource(only = PARAMS.get('devtest') || undefined) {
-  const { ctx, analyser } = session;
+  const { ctx, tap } = session;
   if (session.src) { try { session.src.stop(); } catch { /* already stopped */ } }
   const demo = renderDemo(ctx.sampleRate, voice, { only });
   const buf = ctx.createBuffer(1, demo.samples.length, ctx.sampleRate);
@@ -207,7 +211,7 @@ function startDemoSource(only = PARAMS.get('devtest') || undefined) {
   const src = ctx.createBufferSource();
   src.buffer = buf;
   src.loop = false; // plays the phrase once, then the session ends
-  src.connect(analyser);
+  src.connect(tap);
   if (!MUTE_DEMO) {
     const out = ctx.createGain();
     out.gain.value = 0.5;
@@ -220,6 +224,7 @@ function startDemoSource(only = PARAMS.get('devtest') || undefined) {
 }
 
 function stop() { // never returns to the landing page
+  if (feedback?.recording) feedback.stop();
   const wasSynth = session?.mode === 'synth';
   if (session) {
     session.stream?.getTracks().forEach((t) => t.stop());
@@ -283,6 +288,18 @@ async function chooseSource(m) {
   }
 }
 document.querySelectorAll('button[data-mode]').forEach((b) => b.addEventListener('click', () => chooseSource(b.dataset.mode)));
+
+/* ---------------- feedback recorder ---------------- */
+let feedback = null;
+feedback = new FeedbackRecorder({
+  getSession: () => session,
+  describe: () => ({
+    mode: session?.mode === 'mic' ? 'Sing' : session?.mode === 'synth' ? 'Synthesize' : session?.mode === 'sample' ? `Listen (${session.sample.id})` : 'idle',
+    voice, view: { ...view }, calibrated: isCalibrated, landmarks,
+    synth: session?.mode === 'synth' ? { ...synth.state } : undefined,
+  }),
+  toast: (msg) => { els.toast.textContent = msg; els.toast.hidden = false; setTimeout(() => { els.toast.hidden = true; }, 5000); },
+});
 // Closing a source panel stops its sound but stays on the dashboard
 document.getElementById('synthClose').addEventListener('click', () => setSourceMode(null));
 document.getElementById('samplesClose').addEventListener('click', () => setSourceMode(null));
@@ -314,6 +331,10 @@ const prune = (arr, now, keep) => { while (arr.length && now - arr[0].t > keep) 
 
 function frame() {
   requestAnimationFrame(frame);
+  render();
+}
+window.__vaRender = () => render(); // dev hook: step one frame while the page is throttled/hidden
+function render() {
   window.__vaFrames = (window.__vaFrames || 0) + 1;
   const now = performance.now() / 1000;
   let o = null;
@@ -389,6 +410,7 @@ function frame() {
   if (o) levelHist.push({ t: now, db: o.rmsDb, clip: o.clipped });
   prune(levelHist, now, 8.5);
   drawMeter(surf.meter, rms, peakHold, view, levelHist, now);
+  feedback?.onFrame(o, now);
 }
 requestAnimationFrame(frame);
 

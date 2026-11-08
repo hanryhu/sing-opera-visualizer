@@ -34,6 +34,7 @@
         <button role="radio" data-voice="low" aria-label="Low voice" title="Tenor · baritone · bass">Low voice</button>
       </div>
       <span id="sourceChip" class="chip" hidden></span>
+      <button id="feedbackBtn" class="toggle feedback-btn" title="Record up to 10 s of the screen and sound to send as feedback">● Feedback</button>
       <button id="helpBtn" class="toggle help-btn" aria-label="Help and sources" title="Help and sources">?</button>
       <button id="stopBtn" class="btn btn-ghost" hidden>Stop</button>
     </div>
@@ -180,6 +181,16 @@
       <p class="fineprint">Audio data never leaves your device.</p>
     </div>
   </div>
+
+  <aside id="feedbackPanel" class="cal-panel feedback-panel" hidden aria-label="Feedback recording">
+    <div class="cal-head">
+      <h2>Feedback recorded</h2>
+      <button id="feedbackClose" class="icon-btn" aria-label="Close">×</button>
+    </div>
+    <p id="feedbackSummary" class="cal-intro"></p>
+    <ul id="feedbackLinks" class="samples"></ul>
+    <div class="cal-actions"><button id="feedbackSaveAll" class="btn btn-primary">Save all files</button></div>
+  </aside>
 
   <div id="toast" class="toast" role="alert" hidden></div>
 

@@ -24,6 +24,12 @@ The mic needs a secure context: `localhost` or HTTPS.
 
 Dev: `?devtest` runs the synthetic melody (vibrato, tuning errors) silently; `?devtest=a` sustains a single vowel; `window.__va.demo('e')` switches it (calibration QA).
 
+## Feedback recordings
+
+**● Feedback** (header) records up to 10 s while any source is running and offers three local files:
+`sing-feedback-<time>.webm` (dashboard video + sound), `.wav` (the exact signal the analyzer heard) and `.json`
+(every analyzer frame + settings). Replaying the WAV through `src/dsp/analyzer.js` reproduces a report exactly.
+
 ## Samples
 
 **Samples** plays a 20–30 s looping excerpt per voice part (bass → soprano) through the analyzer: historic

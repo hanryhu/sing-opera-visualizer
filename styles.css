@@ -338,3 +338,10 @@ body {
 .mode-switch.big button[data-mode="mic"] { background: var(--green); color: #04150b; }
 .mode-switch.big button[data-mode="mic"]:hover { background: #4ff093; }
 .mode-switch button[data-mode="mic"][aria-checked="true"] { background: rgba(54, 224, 127, .16); color: var(--green); }
+
+/* ---------- feedback recorder ---------- */
+.feedback-btn { color: var(--muted); }
+.feedback-btn.recording { color: #fff; background: var(--red); border-color: var(--red); animation: pulse 1.6s infinite; }
+.feedback-panel { width: 400px; }
+.feedback-panel a { color: var(--accent); }
+@media (max-width: 760px) { .feedback-panel { width: auto; position: static; margin: 0 16px 16px; box-shadow: none; } }
