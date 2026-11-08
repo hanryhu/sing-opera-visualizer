@@ -23,8 +23,7 @@ export class SamplesUI {
     this.h = hooks;
     const $ = (id) => document.getElementById(id);
     this.el = { panel: $('samplesPanel'), toggle: $('samplesToggle'), close: $('samplesClose'), list: $('samplesList') };
-    this.el.toggle.addEventListener('click', () => (this.el.panel.hidden ? this.open() : this.close()));
-    this.el.close.addEventListener('click', () => this.close());
+        this.el.close.addEventListener('click', () => this.close());
     this.el.list.addEventListener('click', async (e) => {
       const b = e.target.closest('[data-id]');
       if (!b) return;
@@ -38,13 +37,13 @@ export class SamplesUI {
   open() {
     document.querySelectorAll('.cal-panel').forEach((p) => { if (p !== this.el.panel && !p.hidden) p.querySelector('.icon-btn')?.click(); });
     this.el.panel.hidden = false;
-    this.el.toggle.setAttribute('aria-pressed', 'true');
+    this.el.toggle?.setAttribute('aria-pressed', 'true');
     this.render();
   }
 
   close() {
     this.el.panel.hidden = true;
-    this.el.toggle.setAttribute('aria-pressed', 'false');
+    this.el.toggle?.setAttribute('aria-pressed', 'false');
     if (this.h.playingId()) this.h.stop();
   }
 

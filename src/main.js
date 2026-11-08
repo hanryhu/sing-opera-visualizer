@@ -11,10 +11,10 @@ const FFT = 4096;
 const PARAMS = new URLSearchParams(location.search);
 // Dev only: ?devtest autostarts the synthetic melody silently for visual QA
 // (?devtest=a sustains one vowel, for calibration QA).
-const MUTE_DEMO = PARAMS.has('devtest') || PARAMS.has('devsynth') || PARAMS.has('devsample'); // dev URLs are silent
+const MUTE_DEMO = ['devtest', 'devsynth', 'devsample', 'mute'].some((k) => PARAMS.has(k)); // dev URLs are silent
 const $ = (id) => document.getElementById(id);
 const els = {
-  landing: $('landing'), startBtn: $('startBtn'), error: $('errorMsg'),
+  landing: $('landing'), error: $('errorMsg'), toast: $('toast'),
   stopBtn: $('stopBtn'), chip: $('sourceChip'),
   noteBox: $('noteBox'), noteName: $('noteName'), noteOct: $('noteOct'), tuneState: $('tuneState'),
   mapHint: $('mapHint'), clip: $('clipLamp'), detailReadout: $('detailReadout'),
@@ -41,13 +41,13 @@ if (!VOICE_PRESETS[voice]) voice = 'low';
 function setVoice(v) {
   voice = v;
   store.set('va.voice', v);
-  document.querySelectorAll('.segmented button').forEach((b) =>
+  document.querySelectorAll('button[data-voice]').forEach((b) =>
     b.setAttribute('aria-checked', String(b.dataset.voice === v)));
   if (session?.mode === 'demo') startDemoSource();
   refreshLandmarks();
   calib?.voiceChanged();
 }
-document.querySelectorAll('.segmented button').forEach((b) =>
+document.querySelectorAll('button[data-voice]').forEach((b) =>
   b.addEventListener('click', () => setVoice(b.dataset.voice)));
 
 // Display options
@@ -72,24 +72,23 @@ let calib = null;
 calib = new CalibrationUI({
   getVoice: () => voice,
   voiceLabel: (v) => VOICE_PRESETS[v].label,
-  ensureSession: async () => { if (!session) await start('mic'); return !!session; },
+  ensureSession: async () => { if (!session) await start('mic'); return !!session; }, // calibration sings into the mic
   onSaved: refreshLandmarks,
 });
 const synth = new SynthUI({
   landmarks: () => landmarks,
   f3For: (ipa) => (VOICE_PRESETS[voice].vowels.find((v) => v.ipa === ipa) || { f3: 2700 }).f3,
   start: () => start('synth'),
-  stop: (toLanding) => stop(!toLanding),
+  stop: () => stop(),
   isRunning: () => session?.mode === 'synth',
 });
 let samplesUI = null;
 loadSamples().then((list) => {
   samplesUI = new SamplesUI(list, {
     play: (smp) => start('sample', smp),
-    stop: () => stop(true),
+    stop: () => stop(),
     playingId: () => (session?.mode === 'sample' ? session.sample.id : null),
   });
-  document.getElementById('samplesBtn').addEventListener('click', () => { els.landing.hidden = true; samplesUI.open(); });
   const dev = list.find((x) => x.id === PARAMS.get('devsample'));
   if (dev) { samplesUI.open(); start('sample', dev).then(() => samplesUI.render()); }
 });
@@ -103,7 +102,9 @@ setVoice(voice);
 
 async function start(mode, sample) {
   els.error.hidden = true;
-  if (session) stop(true); // switching source (e.g. mic → synth)
+  els.toast.hidden = true;
+  setSourceMode(mode === 'sample' ? 'listen' : mode === 'demo' ? null : mode);
+  if (session) stop(); // switching source (e.g. mic → synth)
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
     const analyser = ctx.createAnalyser();
@@ -145,7 +146,7 @@ async function start(mode, sample) {
         const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5000;
         src.connect(hp).connect(lp).connect(analyser);
       }
-      src.onended = () => { if (session?.src === src) { stop(true); samplesUI?.render(); } };
+      src.onended = () => { if (session?.src === src) { stop(); samplesUI?.render(); } };
       const t0 = ctx.currentTime + 0.05; // same clock tick for both → sample-aligned
       src.start(t0);
       ana?.start(t0);
@@ -187,7 +188,7 @@ async function start(mode, sample) {
     if (mode === 'synth') synth.attach(session.synthNode);
     resetHistory();
   } catch (err) {
-    stop(true);
+    stop();
     showError(err);
   }
 }
@@ -213,7 +214,7 @@ function startDemoSource(only = PARAMS.get('devtest') || undefined) {
   session.demo = { samples: demo.samples, t0: ctx.currentTime, wall0: performance.now() };
 }
 
-function stop(silent) {
+function stop() { // never returns to the landing page
   const wasSynth = session?.mode === 'synth';
   if (session) {
     session.stream?.getTracks().forEach((t) => t.stop());
@@ -222,7 +223,6 @@ function stop(silent) {
     session.ctx.close().catch(() => {});
   }
   session = null;
-  if (!silent) els.landing.hidden = false;
   els.stopBtn.hidden = true;
   els.chip.hidden = true;
   if (wasSynth) synth.detach();
@@ -240,13 +240,49 @@ function showError(err) {
   } else if (name === 'InsecureContext') {
     msg = 'Microphone access needs a secure page (https:// or http://localhost).';
   }
-  els.error.textContent = msg;
-  els.error.hidden = false;
+  if (!els.landing.hidden) { els.error.textContent = msg; els.error.hidden = false; return; }
+  els.toast.textContent = msg;
+  els.toast.hidden = false;
+  clearTimeout(showError.t);
+  showError.t = setTimeout(() => { els.toast.hidden = true; }, 7000);
 }
 
-els.startBtn.addEventListener('click', () => start('mic'));
-document.getElementById('synthBtn').addEventListener('click', () => synth.open());
-els.stopBtn.addEventListener('click', () => stop());
+/* ---------------- source switch: Sing / Synthesize / Listen ---------------- */
+let sourceMode = null;
+function setSourceMode(m) {
+  sourceMode = m;
+  document.querySelectorAll('button[data-mode]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mode === m)));
+}
+const DEFAULT_SAMPLE = { low: 'tenor', high: 'soprano' };
+async function chooseSource(m) {
+  els.landing.hidden = true; // leaving the landing page is one-way
+  setSourceMode(m);
+  if (m === 'mic') {
+    if (!document.getElementById('synthPanel').hidden) synth.close();
+    if (samplesUI && !document.getElementById('samplesPanel').hidden) samplesUI.close();
+    await start('mic');
+  } else if (m === 'synth') {
+    if (samplesUI && !document.getElementById('samplesPanel').hidden) samplesUI.close();
+    setSourceMode('synth');
+    synth.open();
+  } else if (m === 'listen') {
+    if (!document.getElementById('synthPanel').hidden) synth.close();
+    if (!samplesUI) return;
+    setSourceMode('listen');
+    samplesUI.open();
+    // Start hearing something right away: the clip for the current voice type
+    if (session?.mode !== 'sample') {
+      const smp = samplesUI.samples.find((x) => x.id === DEFAULT_SAMPLE[voice]) || samplesUI.samples[0];
+      if (smp) { await start('sample', smp); samplesUI.render(); }
+    }
+  }
+}
+document.querySelectorAll('button[data-mode]').forEach((b) => b.addEventListener('click', () => chooseSource(b.dataset.mode)));
+// Closing a source panel stops its sound but stays on the dashboard
+document.getElementById('synthClose').addEventListener('click', () => setSourceMode(null));
+document.getElementById('samplesClose').addEventListener('click', () => setSourceMode(null));
+
+els.stopBtn.addEventListener('click', () => { stop(); samplesUI?.render(); });
 
 /* ---------------- analysis + render loop ---------------- */
 const timeBuf = new Float32Array(FFT);
@@ -305,7 +341,7 @@ function frame() {
     els.noteName.textContent = '–';
     els.noteOct.textContent = '';
     els.noteBox.className = 'note';
-    els.tuneState.textContent = session ? 'sing a note' : '';
+    els.tuneState.textContent = !session ? '' : session.mode === 'mic' ? 'sing a note' : 'waiting for a voice';
   }
   lastFrameT = now;
   if (o?.voiced) pitchHist.push({ t: now, midi: o.midiRaw, mean: o.midiMean, state });
@@ -344,7 +380,7 @@ requestAnimationFrame(frame);
 
 // Never leave the demo voice playing in a background tab.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && session && session.mode !== 'mic') { stop(true); samplesUI?.render(); }
+  if (document.hidden && session && session.mode !== 'mic') { stop(); samplesUI?.render(); }
 });
 
 // Autostart from URL (see MUTE_DEMO above).

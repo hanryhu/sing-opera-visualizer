@@ -19,11 +19,14 @@
       <span class="brand-app">Vocal Analyzer</span>
     </div>
     <div class="controls">
+      <div class="segmented mode-switch" role="radiogroup" aria-label="Sound source">
+        <button role="radio" data-mode="mic" aria-checked="false" title="Analyze your voice from the microphone">Sing</button>
+        <button role="radio" data-mode="synth" aria-checked="false" title="Hear a synthesized voice with your own F0, F1, F2, F3 and volume">Synthesize</button>
+        <button role="radio" data-mode="listen" aria-checked="false" title="Listen to aria excerpts for each voice part">Listen</button>
+      </div>
       <div class="toggles">
         <button class="toggle" id="detailToggle" aria-pressed="false" title="Show Hz values, grids and extra IPA vowels">Detail</button>
         <button class="toggle" id="quarterToggle" aria-pressed="false" title="Label quarter-tone pitches">¼ tones</button>
-        <button class="toggle" id="samplesToggle" aria-pressed="false" title="Listen to aria excerpts for each voice part">Samples</button>
-        <button class="toggle" id="synthToggle" aria-pressed="false" title="Hear a synthesized voice with your own F0, F1, F2, F3 and volume">Synthesize</button>
         <button class="toggle" id="calibToggle" aria-pressed="false" title="Record your own vowels">Calibrate</button>
       </div>
       <div class="segmented" role="radiogroup" aria-label="Voice type">
@@ -159,15 +162,17 @@
     <div class="landing-card">
       <h1>Sing Together</h1>
       <p>Live Pitch and Resonance visualizer</p>
-      <div class="landing-actions">
-        <button id="startBtn" class="btn btn-primary">Start analyzing</button>
-        <button id="samplesBtn" class="btn btn-secondary">Listen to samples</button>
-        <button id="synthBtn" class="btn btn-secondary">Synthesize a voice</button>
+      <div class="segmented mode-switch big" role="radiogroup" aria-label="Choose how to start">
+        <button role="radio" data-mode="mic" aria-checked="false">Sing</button>
+        <button role="radio" data-mode="synth" aria-checked="false">Synthesize</button>
+        <button role="radio" data-mode="listen" aria-checked="false">Listen</button>
       </div>
       <p id="errorMsg" class="error" role="alert" hidden></p>
       <p class="fineprint">Audio data never leaves your device.</p>
     </div>
   </div>
+
+  <div id="toast" class="toast" role="alert" hidden></div>
 
   <script type="module" src="src/main.js"></script>
 </body>

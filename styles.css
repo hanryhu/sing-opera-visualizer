@@ -19,6 +19,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; } /* component display rules must never override hidden */
 html, body { margin: 0; height: 100%; }
 body {
   background: var(--bg);
@@ -319,3 +320,15 @@ body {
 @media (max-width: 760px) {
   .samples-panel { width: auto; position: static; margin: 0 16px 16px; box-shadow: none; }
 }
+
+/* ---------- source switch + toast ---------- */
+.mode-switch button[aria-checked="true"] { background: rgba(124, 196, 255, .16); color: var(--accent); }
+.mode-switch.big { display: flex; width: 100%; padding: 4px; margin: 6px 0 18px; border-radius: 12px; }
+.mode-switch.big button { flex: 1; padding: 12px 10px; font-size: 15px; font-weight: 600; color: var(--text); border-radius: 9px; }
+.mode-switch.big button:hover { background: var(--line-strong); }
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 20; max-width: min(560px, calc(100vw - 32px));
+  background: #2a1418; color: #ffd0d5; border: 1px solid rgba(255, 77, 94, .45); border-radius: 12px;
+  padding: 10px 14px; font-size: 13px; box-shadow: 0 16px 40px rgba(0, 0, 0, .5);
+}
+.toast[hidden] { display: none; }

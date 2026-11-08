@@ -10,7 +10,7 @@ const noteLabel = (m) => `${NOTE_NAMES[((m % 12) + 12) % 12]}${Math.floor(m / 12
 export class SynthUI {
   /**
    * @param {{landmarks:()=>{ipa:string,f1:number,f2:number,f3?:number}[], f3For:(ipa:string)=>number,
-   *          start:()=>Promise<void>, stop:(toLanding:boolean)=>void, isRunning:()=>boolean}} hooks
+   *          start:()=>Promise<void>, stop:()=>void, isRunning:()=>boolean}} hooks
    */
   constructor(hooks) {
     this.h = hooks;
@@ -33,9 +33,8 @@ export class SynthUI {
       input.addEventListener('input', () => { this.state[k] = Number(input.value); this.apply(); });
     }
     this.el.vib.addEventListener('change', () => { this.state.vibrato = this.el.vib.checked; this.apply(); });
-    this.el.toggle.addEventListener('click', () => (this.el.panel.hidden ? this.open() : this.close()));
-    this.el.close.addEventListener('click', () => this.close());
-    this.el.play.addEventListener('click', () => (this.h.isRunning() ? this.h.stop(false) : this.h.start()));
+        this.el.close.addEventListener('click', () => this.close());
+    this.el.play.addEventListener('click', () => (this.h.isRunning() ? this.h.stop() : this.h.start()));
     this.el.chips.addEventListener('click', (e) => {
       const b = e.target.closest('[data-ipa]');
       if (!b) return;
@@ -53,15 +52,15 @@ export class SynthUI {
 
   open() {
     this.el.panel.hidden = false;
-    this.el.toggle.setAttribute('aria-pressed', 'true');
+    this.el.toggle?.setAttribute('aria-pressed', 'true');
     this.render();
     if (!this.h.isRunning()) this.h.start();
   }
 
   close() {
     this.el.panel.hidden = true;
-    this.el.toggle.setAttribute('aria-pressed', 'false');
-    if (this.h.isRunning()) this.h.stop(true);
+    this.el.toggle?.setAttribute('aria-pressed', 'false');
+    if (this.h.isRunning()) this.h.stop();
   }
 
   apply() {
