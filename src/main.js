@@ -312,7 +312,8 @@ const timeBuf = new Float32Array(FFT);
 const specBuf = new Float32Array(FFT / 2);
 let pitchHist = [], formantTrail = [], f3Trail = [], levelHist = [], lastPair = null;
 const BASE_SPAN = 5, MAX_SPAN = 17; // semitones visible in the pitch trace
-let viewSpan = BASE_SPAN, lastDistortT = -10, lastFrameT = 0, viewCenter = 60, peakHold = -100, peakHoldT = 0, clipT = -10;
+const ZOOM_HOLD = 10; // s to keep a zoomed-out view after it was last needed
+let heldSpan = BASE_SPAN, lastWideT = -100, viewSpan = BASE_SPAN, lastDistortT = -10, lastFrameT = 0, viewCenter = 60, peakHold = -100, peakHoldT = 0, clipT = -10;
 function resetHistory() { pitchHist = []; formantTrail = []; f3Trail = []; levelHist = []; lastPair = null; }
 
 function readFrame(now) {
@@ -359,21 +360,33 @@ function render() {
     els.tuneState.textContent = state === 'in' ? 'in tune'
       : state === 'near' ? (cents > 0 ? 'a little sharp' : 'a little flat')
       : 'between notes';
-    // Auto-zoom: if the pitch has recently moved over a wide range (scale, arpeggio, wobbly sustain),
-    // smoothly widen the trace to fit it; zoom back in on a steady note.
+    // Auto-zoom, tuned for comfort: zoom OUT promptly when the pitch has spread over a wide range in the last
+    // 3 s; HOLD that zoom until it hasn't been needed for ZOOM_HOLD s (even after those notes scroll off);
+    // zoom back IN slowly. While zoomed out the view doesn't pan unless the pitch nears an edge.
     const dt = Math.min(0.5, now - (lastFrameT || now));
     const recent = pitchHist.filter((p) => now - p.t < 3).map((p) => p.midi).sort((a, b) => a - b);
-    let targetSpan = BASE_SPAN, targetCenter = nearest;
+    let needSpan = BASE_SPAN, needCenter = nearest;
     if (recent.length > 10) {
       const lo = recent[Math.floor(recent.length * 0.05)], hi = recent[Math.floor(recent.length * 0.95)];
-      if (hi - lo > BASE_SPAN - 2) {
-        targetSpan = Math.min(MAX_SPAN, hi - lo + 3);
-        targetCenter = (lo + hi) / 2;
+      if (hi - lo > BASE_SPAN - 2) { needSpan = Math.min(MAX_SPAN, hi - lo + 3); needCenter = (lo + hi) / 2; }
+    }
+    if (needSpan >= heldSpan - 1 && needSpan > BASE_SPAN) { heldSpan = Math.max(heldSpan, needSpan); lastWideT = now; }
+    if (now - lastWideT > ZOOM_HOLD) heldSpan = BASE_SPAN; // wide view unused for a while: release
+    const zoomingIn = heldSpan < viewSpan;
+    viewSpan += (heldSpan - viewSpan) * (1 - Math.exp(-dt / (zoomingIn ? 2.0 : 0.5)));
+    const zoomed = viewSpan > BASE_SPAN + 0.5;
+    if (!zoomed) {
+      if (Math.abs(nearest - viewCenter) > 3) viewCenter = nearest; // leap
+      else viewCenter += (nearest - viewCenter) * (1 - Math.exp(-dt / 0.08));
+    } else {
+      // Pan only when the sung pitch gets within 20% of the top/bottom edge (or on first zoom-out)
+      const target = needSpan > BASE_SPAN ? needCenter : nearest;
+      const margin = viewSpan * 0.3;
+      if (Math.abs(o.midiMean - viewCenter) > viewSpan / 2 - margin || Math.abs(target - viewCenter) > viewSpan / 2) {
+        viewCenter += (target - viewCenter) * (1 - Math.exp(-dt / 0.8));
       }
     }
-    viewSpan += (targetSpan - viewSpan) * (1 - Math.exp(-dt / 0.5)); // ~0.5 s zoom
-    if (viewSpan < BASE_SPAN + 0.5 && Math.abs(targetCenter - viewCenter) > 3) viewCenter = targetCenter; // leap
-    else viewCenter += (targetCenter - viewCenter) * (1 - Math.exp(-dt / (viewSpan > BASE_SPAN + 0.5 ? 0.4 : 0.08)));
+    window.__vaZoom = { viewSpan, heldSpan, sinceWide: now - lastWideT }; // dev/QA readout
     els.detailReadout.textContent = `${cents >= 0 ? '+' : '−'}${Math.abs(cents).toFixed(0)}¢ · ${o.f0 ? o.f0.toFixed(1) + ' Hz' : ''}`;
   } else {
     els.detailReadout.textContent = '';
