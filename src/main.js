@@ -10,7 +10,7 @@ const PARAMS = new URLSearchParams(location.search);
 const MUTE_DEMO = PARAMS.has('demo') || PARAMS.has('test'); // dev URLs play silently
 const $ = (id) => document.getElementById(id);
 const els = {
-  landing: $('landing'), startBtn: $('startBtn'), demoBtn: $('demoBtn'), error: $('errorMsg'),
+  landing: $('landing'), startBtn: $('startBtn'), error: $('errorMsg'),
   stopBtn: $('stopBtn'), chip: $('sourceChip'),
   noteBox: $('noteBox'), noteName: $('noteName'), noteOct: $('noteOct'), tuneState: $('tuneState'),
   mapHint: $('mapHint'), clip: $('clipLamp'), detailReadout: $('detailReadout'),
@@ -104,7 +104,7 @@ async function start(mode) {
     els.landing.hidden = true;
     els.stopBtn.hidden = false;
     els.chip.hidden = false;
-    els.chip.textContent = mode === 'mic' ? 'Listening' : mode === 'test' ? 'Test signal' : 'Demo voice';
+    els.chip.textContent = mode === 'mic' ? 'Listening' : mode === 'test' ? 'Demo mode' : 'Demo melody';
     resetHistory();
   } catch (err) {
     stop(true);
@@ -163,7 +163,6 @@ function showError(err) {
 }
 
 els.startBtn.addEventListener('click', () => start('mic'));
-els.demoBtn.addEventListener('click', () => start('demo'));
 document.getElementById('testBtn').addEventListener('click', () => start('test'));
 els.stopBtn.addEventListener('click', () => stop());
 
