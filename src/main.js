@@ -398,18 +398,14 @@ function render() {
     if (now - lastWideT > ZOOM_HOLD) heldSpan = BASE_SPAN; // wide view unused for a while: release
     const zoomingIn = heldSpan < viewSpan;
     viewSpan += (heldSpan - viewSpan) * (1 - Math.exp(-dt / (zoomingIn ? 2.0 : 0.5)));
-    const zoomed = viewSpan > BASE_SPAN + 0.5;
-    if (!zoomed) {
-      if (Math.abs(nearest - viewCenter) > 3) viewCenter = nearest; // leap
-      else viewCenter += (nearest - viewCenter) * (1 - Math.exp(-dt / 0.08));
-    } else {
-      // Pan only when the sung pitch gets within 20% of the top/bottom edge (or on first zoom-out)
-      const target = needSpan > BASE_SPAN ? needCenter : nearest;
-      const margin = viewSpan * 0.3;
-      if (Math.abs(o.midiMean - viewCenter) > viewSpan / 2 - margin || Math.abs(target - viewCenter) > viewSpan / 2) {
-        viewCenter += (target - viewCenter) * (1 - Math.exp(-dt / 0.8));
-      }
-    }
+    // Vertical framing, same rule at every zoom level (motion-sickness friendly): stay still while the
+    // pitch is inside the middle of the view; ease when it nears the top/bottom 25%; jump once (no
+    // glide) if it leaves the view entirely.
+    const target = needSpan > BASE_SPAN ? needCenter : nearest;
+    const half = viewSpan / 2;
+    const off = o.midiMean - viewCenter;
+    if (Math.abs(off) > half) viewCenter = target;
+    else if (Math.abs(off) > half * 0.5) viewCenter += (target - viewCenter) * (1 - Math.exp(-dt / 0.8));
     window.__vaZoom = { viewSpan, heldSpan, sinceWide: now - lastWideT }; // dev/QA readout
     els.detailReadout.textContent = `${cents >= 0 ? '+' : '−'}${Math.abs(cents).toFixed(0)}¢ · ${o.f0 ? o.f0.toFixed(1) + ' Hz' : ''}`;
   } else {

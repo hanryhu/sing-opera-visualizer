@@ -49,6 +49,23 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.roundRect(x, y, Math.max(0, w), h, r);
 }
 
+/* Heart-monitor style sweep (no scrolling, to avoid motion sickness): a sample's x position is fixed
+   by its time modulo the window; a write head moves left→right and erases the oldest data just ahead
+   of it. Returns null for samples that are erased or too old. */
+const SWEEP_GAP = 0.06; // fraction of the window kept blank ahead of the head
+function sweepX(t, now, win, x0, x1) {
+  const age = now - t;
+  if (age < 0 || age > win * (1 - SWEEP_GAP)) return null;
+  return x0 + ((((t / win) % 1) + 1) % 1) * (x1 - x0);
+}
+function sweepHead(ctx, now, win, x0, x1, y0, y1) {
+  const x = x0 + ((((now / win) % 1) + 1) % 1) * (x1 - x0);
+  ctx.save();
+  ctx.fillStyle = rgba(C.accent, 0.35);
+  ctx.fillRect(x - 0.75, y0, 1.5, y1 - y0);
+  ctx.restore();
+}
+
 /* ------------------------------------------------------------------ */
 /* Tuner gauge: −50…+50 cents                                          */
 /* ------------------------------------------------------------------ */
@@ -104,7 +121,7 @@ export function drawTrace(s, hist, now, centerMidi, opts = {}) {
   const rows = Math.max(opts.span || 0, h < 150 ? 4 : 5);
   const rowPx = (h - top - bottom) / rows;
   const yOf = (m) => top + (h - top - bottom) / 2 - (m - centerMidi) * rowPx;
-  const xOf = (t) => w - right - ((now - t) / window) * (w - left - right);
+  const xOf = (t) => sweepX(t, now, window, left, w - right); // fixed position; null once erased
   const stepSize = opts.quarter ? 0.5 : 1;
 
   const lo = Math.floor(centerMidi - rows / 2 - 1), hi = Math.ceil(centerMidi + rows / 2 + 1);
@@ -143,24 +160,26 @@ export function drawTrace(s, hist, now, centerMidi, opts = {}) {
     }
   }
 
-  // Trace
+  // Trace (sweep: drawn where the head was at that moment; never scrolls)
+  sweepHead(ctx, now, window, left, w - right, top, h - bottom);
   ctx.lineWidth = 2.2; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  let prev = null;
+  let prev = null, px = null;
   for (const p of hist) {
-    if (now - p.t > window) { prev = null; continue; }
-    if (prev && p.t - prev.t < 0.12) {
+    const x = xOf(p.t);
+    if (x === null) { prev = null; continue; }
+    if (prev && px !== null && x >= px && p.t - prev.t < 0.12) { // x < px means it wrapped: break the line
       ctx.strokeStyle = stateColor(p.state);
       ctx.globalAlpha = 0.35 + 0.65 * (1 - (now - p.t) / window);
       ctx.beginPath();
-      ctx.moveTo(xOf(prev.t), yOf(prev.midi));
-      ctx.lineTo(xOf(p.t), yOf(p.midi));
+      ctx.moveTo(px, yOf(prev.midi));
+      ctx.lineTo(x, yOf(p.midi));
       ctx.stroke();
     }
-    prev = p;
+    prev = p; px = x;
   }
   ctx.globalAlpha = 1;
   const last = hist[hist.length - 1];
-  if (last && now - last.t < 0.15) {
+  if (last && now - last.t < 0.15 && xOf(last.t) !== null) {
     ctx.save();
     ctx.fillStyle = stateColor(last.state);
     ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 10;
@@ -550,7 +569,7 @@ export function drawMeter(s, rmsDb, peakHoldDb, opts = {}, hist = [], now = 0) {
   const hy0 = y + bh + 30, hy1 = h - 12;
   if (hy1 - hy0 < 30) return;
   const span = 8; // seconds
-  const hx = (t) => x1 - ((now - t) / span) * (x1 - x0);
+  const hx = (t) => sweepX(t, now, span, x0, x1); // sweep, like the pitch trace
   const hyOf = (db) => hy1 - ((Math.max(DB_MIN, Math.min(0, db)) - DB_MIN) / -DB_MIN) * (hy1 - hy0);
 
   roundRect(ctx, x0, hy0, x1 - x0, hy1 - hy0, 8);
@@ -566,25 +585,39 @@ export function drawMeter(s, rmsDb, peakHoldDb, opts = {}, hist = [], now = 0) {
   ctx.fillStyle = rgba(C.orange, 0.7); ctx.fillText(D ? '−6 dB' : 'loud', x0 + 6, hyOf(-6) - 2);
   ctx.fillStyle = C.faint; ctx.fillText(D ? '−45 dB' : 'quiet', x0 + 6, hyOf(-45) - 2);
 
-  const pts = hist.filter((p) => now - p.t <= span);
-  if (pts.length > 1) {
+  // Split into runs of increasing x (a run ends where the sweep wrapped or data was erased)
+  const runs = [];
+  let run = [], lastX = -Infinity;
+  for (const p of hist) {
+    const x = hx(p.t);
+    if (x === null) continue;
+    if (x < lastX) { if (run.length) runs.push(run); run = []; }
+    run.push({ x, db: p.db, clip: p.clip });
+    lastX = x;
+  }
+  if (run.length) runs.push(run);
+  sweepHead(ctx, now, span, x0, x1, hy0, hy1);
+  if (runs.length) {
     ctx.save();
     roundRect(ctx, x0, hy0, x1 - x0, hy1 - hy0, 8); ctx.clip();
-    ctx.beginPath();
-    ctx.moveTo(hx(pts[0].t), hy1);
-    for (const p of pts) ctx.lineTo(hx(p.t), hyOf(p.db));
-    ctx.lineTo(hx(pts[pts.length - 1].t), hy1);
-    ctx.closePath();
     const g = ctx.createLinearGradient(0, hy0, 0, hy1);
     g.addColorStop(0, rgba(C.orange, 0.35));
     g.addColorStop((hyOf(-6) - hy0) / (hy1 - hy0), rgba(C.green, 0.3));
     g.addColorStop(1, rgba(C.green, 0.04));
-    ctx.fillStyle = g; ctx.fill();
-    ctx.beginPath();
-    pts.forEach((p, i) => (i ? ctx.lineTo(hx(p.t), hyOf(p.db)) : ctx.moveTo(hx(p.t), hyOf(p.db))));
-    ctx.strokeStyle = C.green; ctx.lineWidth = 1.5; ctx.stroke();
-    ctx.fillStyle = '#ff4d5e';
-    for (const p of pts) if (p.clip) ctx.fillRect(hx(p.t) - 1, hy0, 2, hy1 - hy0);
+    for (const r of runs) {
+      if (r.length < 2) continue;
+      ctx.beginPath();
+      ctx.moveTo(r[0].x, hy1);
+      for (const p of r) ctx.lineTo(p.x, hyOf(p.db));
+      ctx.lineTo(r[r.length - 1].x, hy1);
+      ctx.closePath();
+      ctx.fillStyle = g; ctx.fill();
+      ctx.beginPath();
+      r.forEach((p, i) => (i ? ctx.lineTo(p.x, hyOf(p.db)) : ctx.moveTo(p.x, hyOf(p.db))));
+      ctx.strokeStyle = C.green; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = '#ff4d5e';
+      for (const p of r) if (p.clip) ctx.fillRect(p.x - 1, hy0, 2, hy1 - hy0);
+    }
     ctx.restore();
   }
 }
