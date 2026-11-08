@@ -311,7 +311,7 @@ els.stopBtn.addEventListener('click', () => { stop(); samplesUI?.render(); });
 const timeBuf = new Float32Array(FFT);
 const specBuf = new Float32Array(FFT / 2);
 let pitchHist = [], formantTrail = [], f3Trail = [], levelHist = [], lastPair = null;
-const BASE_SPAN = 5, MAX_SPAN = 17; // semitones visible in the pitch trace
+const BASE_SPAN = 5, MAX_SPAN = 13; // semitones visible in the pitch trace (max ≈ an octave + margin)
 const ZOOM_HOLD = 10; // s to keep a zoomed-out view after it was last needed
 let heldSpan = BASE_SPAN, lastWideT = -100, viewSpan = BASE_SPAN, lastDistortT = -10, lastFrameT = 0, viewCenter = 60, peakHold = -100, peakHoldT = 0, clipT = -10;
 function resetHistory() { pitchHist = []; formantTrail = []; f3Trail = []; levelHist = []; lastPair = null; }
