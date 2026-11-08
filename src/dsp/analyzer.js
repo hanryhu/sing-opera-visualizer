@@ -103,6 +103,7 @@ export class Analyzer {
         //     recordings make this common. A real octave leap survives: it moves `recent` within 3 frames.
         const dev = midi - recent;
         if (Math.abs(Math.abs(dev) - 12) < 0.8) midi -= 12 * Math.sign(dev);
+        out.midiFast = midi; // octave-corrected but not median-smoothed (keeps vibrato peaks for vibrato analysis)
         // (2) Median of the last 5 (folded) readings removes remaining one-frame spikes.
         this.foldHist = this.rawHist.length === 1 ? [] : this.foldHist || [];
         this.foldHist.push(midi);

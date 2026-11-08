@@ -6,7 +6,8 @@ import { CalibrationUI, calibratedLandmarks } from './calibration.js';
 import { SynthUI } from './synth.js';
 import { SamplesUI, loadSamples, pickFile } from './sampleplayer.js';
 import { FeedbackRecorder } from './feedback.js';
-import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter, mapGeometry, f3Geometry } from './ui/panels.js';
+import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter, drawVibrato, mapGeometry, f3Geometry } from './ui/panels.js';
+import { analyzeVibrato, RATE_BAND, RATE_BEST, EXTENT_BAND } from './dsp/vibrato.js';
 
 const FFT = 4096;
 const PARAMS = new URLSearchParams(location.search);
@@ -28,6 +29,7 @@ const surf = {
   f3: new Surface($('f3canvas')),
   map: new Surface($('mapcanvas')),
   meter: new Surface($('metercanvas')),
+  vib: new Surface($('vibcanvas')),
 };
 
 let session = null; // { ctx, analyser, mode, analyzer, stream?, src?, demo? }
@@ -347,11 +349,12 @@ els.stopBtn.addEventListener('click', () => { stop(); samplesUI?.render(); });
 /* ---------------- analysis + render loop ---------------- */
 const timeBuf = new Float32Array(FFT);
 const specBuf = new Float32Array(FFT / 2);
-let pitchHist = [], formantTrail = [], f3Trail = [], levelHist = [], lastPair = null;
+let pitchHist = [], vibHist = [], formantTrail = [], f3Trail = [], levelHist = [], lastPair = null;
 const BASE_SPAN = 5, MAX_SPAN = 13; // semitones visible in the pitch trace (max ≈ an octave + margin)
 const ZOOM_HOLD = 10; // s to keep a zoomed-out view after it was last needed
+let lastVib = null; // last confident vibrato reading (bridges brief dropouts)
 let heldSpan = BASE_SPAN, lastWideT = -100, viewSpan = BASE_SPAN, lastDistortT = -10, lastFrameT = 0, viewCenter = 60, peakHold = -100, peakHoldT = 0, clipT = -10;
-function resetHistory() { pitchHist = []; formantTrail = []; f3Trail = []; levelHist = []; lastPair = null; }
+function resetHistory() { pitchHist = []; vibHist = []; formantTrail = []; f3Trail = []; levelHist = []; lastPair = null; }
 
 function readFrame(now) {
   const { analyser, ctx, demo } = session;
@@ -434,6 +437,13 @@ function render() {
   els.detailReadout.hidden = !view.detail;
   drawGauge(surf.gauge, cents, rawCents, state, view);
   drawTrace(surf.trace, pitchHist, now, viewCenter, { ...view, span: viewSpan });
+  // Vibrato: rate + extent of the held note, against published reference bands
+  if (o?.voiced && o.midiFast) vibHist.push({ t: now, midi: o.midiFast });
+  prune(vibHist, now, 1.5);
+  const vib = session ? analyzeVibrato(vibHist, now, 2048 / session.ctx.sampleRate) : null; // 2048-sample pitch window
+  if (vib?.present) lastVib = { ...vib, t: now };
+  const vibShown = vib && !vib.present && lastVib && now - lastVib.t < 0.4 ? lastVib : vib; // ride over brief dropouts
+  drawVibrato(surf.vib, vibShown, { detail: view.detail, rateBand: RATE_BAND, rateBest: RATE_BEST, extentBand: EXTENT_BAND });
 
   // ---- Formants ----
   const cur = o?.f1 && o?.f2 ? { f1: o.f1, f2: o.f2 } : null;

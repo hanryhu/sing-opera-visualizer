@@ -52,7 +52,7 @@
         <canvas id="gauge" class="gauge"></canvas>
         <label class="synth-inline synth-only" title="Synthesizer pitch (F0)"><span>F0</span><input id="iMidi" type="range" min="36" max="84" step="1"><output id="ioMidi"></output></label>
       </div>
-      <div class="fill"><canvas id="trace"></canvas></div>
+      <div class="fill"><canvas id="trace"></canvas><canvas id="vibcanvas" class="vibrato-box" aria-label="Vibrato rate and extent"></canvas></div>
     </section>
 
     <section class="panel f3">
@@ -140,6 +140,14 @@
       <p>The big letter is the nearest note. <b class="g">Green</b> = within 10¢, <b class="o">orange</b> = within 30¢,
         grey = between notes. The colour uses your pitch averaged over ~½ s, so vibrato doesn't flicker it; the trace
         shows the raw pitch so you can see vibrato width and evenness.</p>
+      <h3>Vibrato</h3>
+      <p>Measured on held notes (about 0.6 s or longer): the <b>rate</b> (wobbles per second) and the
+        <b>extent</b> (how far the pitch swings either side, in cents). The shaded band is the 5.5–6.7 Hz measured on
+        sustained notes of ten celebrated singers (Prame 1994); the tick marks 6 Hz, which listeners rated most
+        appropriate (Anand et al. 2012). Professional extents ranged about ±34 to ±123 cents, averaging ±71
+        (Prame 1997); very wide vibrato was rated less appropriate. Rates naturally speed up near the end of a note.
+        No study we found prescribes vibrato rate by tempo — very short notes simply don't last long enough for a
+        full cycle (≈0.17 s at 6 Hz).</p>
       <h3>F3 · ring</h3>
       <p>The third formant. Lip rounding lowers it, so the pointer moves toward <i>rounded</i>. The labels show the
         unrounded/rounded pair for the vowel you're singing (e.g. ʌ / ɔ). The green zone around 3 kHz is where trained

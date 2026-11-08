@@ -370,3 +370,7 @@ body.synth-on #mapcanvas, body.synth-on #f3canvas { cursor: crosshair; touch-act
   .meter-vol { right: 64px; }
   .meter-vol input { width: 110px; }
 }
+
+/* ---------- vibrato indicator (top-right of the pitch trace) ---------- */
+.fill > canvas.vibrato-box { position: absolute; inset: auto; top: 8px; right: 10px; width: 230px; height: 44px; pointer-events: none; }
+@media (max-width: 760px) { .fill > canvas.vibrato-box { width: 180px; } }

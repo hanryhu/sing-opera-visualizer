@@ -85,6 +85,22 @@ export const SOURCES = [
     use: 'RING: observed minus vowel-predicted level near 3 kHz; ≥ 6 dB = singer’s formant. Calibrated to his Fig. 8 (−30 dB at F1 0.5 / F2 1 kHz).',
   },
   {
+    cite: 'Prame, E. (1994). Measurements of the vibrato rate of ten singers. JASA 96(4), 1979–1984.',
+    use: 'Vibrato rate band 5.5–6.7 Hz (sustained notes); rate rises toward the end of notes.',
+  },
+  {
+    cite: 'Prame, E. (1997). Vibrato extent and intonation in professional Western lyric singing. JASA 102(1), 616–621.',
+    use: 'Vibrato extent: about ±34 to ±123 cents across professionals, mean ±71.',
+  },
+  {
+    cite: 'Anand, S., Wingate, J. M., Smith, B. & Shrivastav, R. (2012). Acoustic parameters critical for an appropriate vibrato. Journal of Voice 26(6), 820.e19–820.e25.',
+    use: 'Listener-rated appropriateness peaks at ~6 Hz and falls with greater depth.',
+  },
+  {
+    cite: 'Ferrante, I. (2011). Vibrato rate and extent in soprano voice: a survey on one century of singing. JASA 130(3), 1683–1688.',
+    use: 'Context: soprano vibrato rate fell and extent rose over the 20th century.',
+  },
+  {
     cite: 'Omori, K., Kacker, A., Carroll, L. M., Riley, W. D. & Blaugrund, S. M. (1996). Singing power ratio: quantitative evaluation of singing voice quality. Journal of Voice 10(3), 228–235.',
     use: 'Related fixed-band measure (2–4 kHz vs 0–2 kHz); not used because it varies with the vowel.',
   },

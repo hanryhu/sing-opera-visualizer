@@ -632,3 +632,49 @@ export function drawMeter(s, rmsDb, peakHoldDb, opts = {}, hist = [], now = 0) {
     ctx.restore();
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Vibrato indicator (rate scale with the published "typical" band)    */
+/* ------------------------------------------------------------------ */
+export function drawVibrato(s, v, opts = {}) {
+  const ctx = s.begin();
+  const { w, h } = s;
+  const [bLo, bHi] = opts.rateBand, best = opts.rateBest, [eLo, eHi] = opts.extentBand;
+  const LO = 3.5, HI = 8.5, x0 = 10, x1 = w - 10, y = h - 13;
+  const xOf = (hz) => x0 + ((Math.max(LO, Math.min(HI, hz)) - LO) / (HI - LO)) * (x1 - x0);
+  roundRect(ctx, 0.5, 0.5, w - 1, h - 1, 8);
+  ctx.fillStyle = 'rgba(11,13,18,.72)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.stroke();
+  ctx.font = `600 10px ${C.ui}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  ctx.fillStyle = C.muted; ctx.fillText('VIBRATO', x0, 12);
+
+  // scale: track, typical band, "most appropriate" tick
+  roundRect(ctx, x0, y - 3, x1 - x0, 6, 3); ctx.fillStyle = C.track; ctx.fill();
+  ctx.fillStyle = rgba(C.green, 0.35); ctx.fillRect(xOf(bLo), y - 3, xOf(bHi) - xOf(bLo), 6);
+  ctx.fillStyle = rgba(C.green, 0.9); ctx.fillRect(xOf(best) - 0.75, y - 6, 1.5, 12);
+  if (opts.detail) {
+    ctx.font = `500 8px ${C.ui}`; ctx.fillStyle = C.faint; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (const hz of [4, 5, 6, 7, 8]) ctx.fillText(String(hz), xOf(hz), y + 4);
+    ctx.textBaseline = 'middle';
+  }
+
+  ctx.textAlign = 'right'; ctx.font = `600 11px ${C.ui}`;
+  if (!v) { ctx.fillStyle = C.faint; ctx.fillText('hold a note', x1, 12); return; }
+  if (!v.present) { ctx.fillStyle = C.muted; ctx.fillText('straight tone', x1, 12); return; }
+
+  const rateWord = v.rate < bLo - 0.5 ? 'slow' : v.rate < bLo ? 'a little slow' : v.rate <= bHi ? 'typical'
+    : v.rate <= bHi + 0.8 ? 'a little fast' : 'fast';
+  const extWord = v.extent < eLo ? 'narrow' : v.extent > eHi ? 'wide' : '';
+  const inRate = v.rate >= bLo && v.rate <= bHi, nearRate = v.rate >= bLo - 0.5 && v.rate <= bHi + 0.8;
+  const col = inRate ? C.green : nearRate ? C.orange : C.muted;
+  const txt = opts.detail
+    ? `${v.rate.toFixed(1)} Hz · ±${Math.round(v.extent)}¢`
+    : `${rateWord}${extWord ? ' · ' + extWord : ''}`;
+  ctx.fillStyle = col; ctx.fillText(txt, x1, 12);
+  if (opts.detail && extWord) { ctx.font = `500 10px ${C.ui}`; ctx.fillStyle = C.orange; ctx.fillText(extWord, x1 - ctx.measureText(txt).width - 30, 12); }
+  // marker
+  ctx.save();
+  ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = inRate ? 8 : 0;
+  ctx.beginPath(); ctx.arc(xOf(v.rate), y, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}

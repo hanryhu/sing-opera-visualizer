@@ -69,7 +69,7 @@ class FormantSynth extends AudioWorkletProcessor {
 
     const fadeStep = 1 / (0.08 * fs); // 80 ms fade-in
     for (let n = 0; n < ch.length; n++) {
-      this.vibPhase += 5.5 / fs;
+      this.vibPhase += 6.0 / fs; // 6 Hz: rated most appropriate by listeners (Anand et al. 2012)
       if (this.vibPhase >= 1) this.vibPhase -= 1;
       const f0 = c.f0 * Math.pow(2, (c.vib * 0.5 * Math.sin(2 * Math.PI * this.vibPhase)) / 12);
       this.phase += f0 / fs;
