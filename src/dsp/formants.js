@@ -168,7 +168,7 @@ export function estimateFormants(frame, sampleRate, opts = {}) {
 /* all-pole envelope to the harmonic amplitudes alone.                 */
 /* ------------------------------------------------------------------ */
 
-function fft(re, im) {
+export function fft(re, im) {
   const n = re.length;
   for (let i = 1, j = 0; i < n; i++) {
     let bit = n >> 1;

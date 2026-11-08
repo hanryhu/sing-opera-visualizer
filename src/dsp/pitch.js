@@ -47,6 +47,21 @@ export function yin(buf, sampleRate, fmin = 60, fmax = 1500, threshold = 0.15) {
     for (let t = tauMin; t <= tauMax; t++) if (d[t] < d[best]) best = t;
     tau = best;
   }
+  // A strong harmonic (e.g. the 3rd, when a vowel's F1 sits on it) can make tau/2 or tau/3 dip just
+  // under the threshold, so the first dip lands on a harmonic. If an integer multiple of the chosen
+  // lag is far more periodic, the true period is that multiple (fixes E3 read as B4 = 3·f0).
+  // The 2x case needs a clearly poor first pick: mild period doubling (alternate pulses weaker,
+  // d' ≈ 0.09 at the true period) must keep the perceived pitch, not drop an octave.
+  if (d[tau] > 0.04) {
+    for (const k of [2, 3, 4]) {
+      if (k === 2 && d[tau] <= 0.11) continue;
+      const c = Math.round(tau * k);
+      if (c + 1 > tauMax) break;
+      let best = c;
+      for (let t = Math.max(tauMin, c - 2); t <= Math.min(tauMax, c + 2); t++) if (d[t] < d[best]) best = t;
+      if (d[best] < 0.4 * d[tau]) { tau = best; break; }
+    }
+  }
   // Strong high harmonics (e.g. F2 of [i]) can put ripples inside the dip;
   // take the true minimum within ±6% of the candidate period.
   {

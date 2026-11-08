@@ -89,6 +89,7 @@ export class Analyzer {
       if (f0 >= 60 && f0 <= 1500 && (loudOk || quietOk)) {
         out.voiced = true;
         // Remove the sharp bias from inharmonic sources (piano) by re-measuring on the low partials
+        // Remove the sharp bias from inharmonic sources (piano) by re-measuring on the low partials
         let midi = freqToMidi(refinePitch(frame.subarray(tail), this.sr, f0), this.a4);
         // Pitch cleanup. Recent raw readings (reset after a gap in voicing):
         if (t - this.lastVoicedT > HOLD) this.rawHist = [];
