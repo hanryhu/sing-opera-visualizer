@@ -1,7 +1,10 @@
 // Per-frame analysis pipeline + smoothing.
 
 import { yin, freqToMidi } from './pitch.js';
-import { estimateFormants } from './formants.js';
+import { estimateFormants, estimateFormantsHarmonic } from './formants.js';
+
+// Above this F0 the harmonics are too sparse for plain LPC; fit the harmonic peaks (DAP) instead.
+const DAP_F0 = 300;
 
 const GATE_DB = -45;
 const MAX_APERIODICITY = 0.25;
@@ -74,7 +77,8 @@ export class Analyzer {
         }
         this.pitchHist.push({ t, midi: out.midiRaw });
 
-        const fm = estimateFormants(frame, this.sr);
+        let fm = f0 > DAP_F0 ? estimateFormantsHarmonic(frame, this.sr, f0) : null;
+        if (!fm || !fm.f1 || !fm.f2) fm = estimateFormants(frame, this.sr); // fall back to LPC
         if (fm) {
           this.f1.push(fm.f1, t);
           this.f2.push(fm.f2, t);

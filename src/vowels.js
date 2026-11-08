@@ -54,6 +54,10 @@ export const SOURCES = [
     use: 'Pitch detection.',
   },
   {
+    cite: 'El-Jaroudi, A. & Makhoul, J. (1991). Discrete all-pole modeling. IEEE Trans. Signal Processing 39(2), 411–423.',
+    use: 'Formant estimation above ~300 Hz F0 (fits the harmonic peaks only).',
+  },
+  {
     cite: 'Sundberg, J. (1974). Articulatory interpretation of the “singing formant”. JASA 55(4), 838–844.',
     use: 'Singer’s formant (~2.8–3.4 kHz) zone on the F3 bar.',
   },

@@ -301,3 +301,21 @@ body {
   .synth-rows { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-flow: row; }
   .srow-spacer { display: none; }
 }
+
+/* ---------- samples ---------- */
+.samples-panel { width: 380px; }
+.samples { list-style: none; margin: 10px 0 8px; padding: 0; display: grid; gap: 4px; }
+.sample { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; }
+.sample.on { background: rgba(124, 196, 255, .08); }
+.sample-play {
+  flex: none; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line-strong);
+  background: var(--panel); color: var(--text); cursor: pointer; font-size: 11px;
+}
+.sample.on .sample-play { background: var(--accent); color: #04121f; border-color: var(--accent); }
+.sample-text { font-size: 13px; line-height: 1.3; min-width: 0; }
+.sample-text i { color: var(--text); }
+.sample-meta { font-size: 11px; color: var(--faint); }
+.sample-note { font-size: 11px; color: var(--faint); margin: 0; }
+@media (max-width: 760px) {
+  .samples-panel { width: auto; position: static; margin: 0 16px 16px; box-shadow: none; }
+}

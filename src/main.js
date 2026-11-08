@@ -4,6 +4,7 @@ import { renderDemo } from './demo.js';
 import { VOICE_PRESETS, extraVowels, roundingPair, SOURCES } from './vowels.js';
 import { CalibrationUI, calibratedLandmarks } from './calibration.js';
 import { SynthUI } from './synth.js';
+import { SamplesUI, loadSamples, pickFile } from './sampleplayer.js';
 import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter } from './ui/panels.js';
 
 const FFT = 4096;
@@ -81,6 +82,15 @@ const synth = new SynthUI({
   stop: (toLanding) => stop(!toLanding),
   isRunning: () => session?.mode === 'synth',
 });
+let samplesUI = null;
+loadSamples().then((list) => {
+  samplesUI = new SamplesUI(list, {
+    play: (smp) => start('sample', smp),
+    stop: () => stop(true),
+    playingId: () => (session?.mode === 'sample' ? session.sample.id : null),
+  });
+  document.getElementById('samplesBtn').addEventListener('click', () => { els.landing.hidden = true; samplesUI.open(); });
+});
 els.calReset.addEventListener('click', () => {
   try { localStorage.removeItem(`va.calib.${voice}`); } catch { /* ignore */ }
   refreshLandmarks();
@@ -89,7 +99,7 @@ setVoice(voice);
 
 /* ---------------- audio session ---------------- */
 
-async function start(mode) {
+async function start(mode, sample) {
   els.error.hidden = true;
   if (session) stop(true); // switching source (e.g. mic → synth)
   try {
@@ -99,7 +109,22 @@ async function start(mode) {
     analyser.smoothingTimeConstant = 0;
     session = { ctx, analyser, mode, analyzer: new Analyzer(ctx.sampleRate) };
 
-    if (mode === 'synth') {
+    if (mode === 'sample') {
+      const res = await fetch(pickFile(sample));
+      if (!res.ok) throw new Error(`could not load ${sample.part} sample`);
+      const buf = await ctx.decodeAudioData(await res.arrayBuffer());
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(analyser);
+      const out = ctx.createGain();
+      out.gain.value = 0.9;
+      src.connect(out).connect(ctx.destination);
+      src.onended = () => { if (session?.src === src) { stop(true); samplesUI?.render(); } };
+      src.start();
+      session.src = src;
+      session.sample = sample;
+      if (sample.voice && sample.voice !== voice) setVoice(sample.voice);
+    } else if (mode === 'synth') {
       await ctx.audioWorklet.addModule('src/synth-worklet.js');
       const node = new AudioWorkletNode(ctx, 'formant-synth', { outputChannelCount: [1] });
       node.connect(analyser);
@@ -125,7 +150,8 @@ async function start(mode) {
     els.landing.hidden = true;
     els.stopBtn.hidden = false;
     els.chip.hidden = false;
-    els.chip.textContent = mode === 'mic' ? 'Listening' : mode === 'synth' ? 'Synthesizing' : 'Dev synth';
+    els.chip.textContent = mode === 'mic' ? 'Listening' : mode === 'synth' ? 'Synthesizing'
+      : mode === 'sample' ? `Playing · ${sample.part}` : 'Dev synth';
     els.chip.classList.toggle('synth', mode === 'synth');
     if (mode === 'synth') synth.attach(session.synthNode);
     resetHistory();
@@ -262,7 +288,7 @@ function frame() {
   if (o?.f3 && o.voiced) f3Trail.push({ t: now, f3: o.f3 });
   prune(formantTrail, now, 1.6);
   prune(f3Trail, now, 1.3);
-  const uncertain = !!(o?.f0 && o.f0 > 520);
+  const uncertain = !!(o?.f0 && o.f0 > 400); // F0 above close-vowel F1: i/u read as more open
   els.mapHint.hidden = !(cur && uncertain);
   drawVowelMap(surf.map, landmarks, cur, formantTrail, now, {
     uncertain, detail: view.detail, calibrated: isCalibrated,
@@ -286,7 +312,7 @@ requestAnimationFrame(frame);
 
 // Never leave the demo voice playing in a background tab.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && (session?.mode === 'demo' || session?.mode === 'synth')) stop();
+  if (document.hidden && session && session.mode !== 'mic') { stop(true); samplesUI?.render(); }
 });
 
 // Autostart from URL (see MUTE_DEMO above).
@@ -299,6 +325,12 @@ const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>'
 document.getElementById('helpSources').innerHTML = SOURCES.map((src) =>
   `<li>${src.url ? `<a href="${esc(src.url)}" target="_blank" rel="noopener">${esc(src.cite)}</a>` : esc(src.cite)}` +
   `<span class="use">${esc(src.use)}</span></li>`).join('');
+loadSamples().then((list) => {
+  if (!list.length) return;
+  document.getElementById('helpSources').insertAdjacentHTML('beforeend', list.map((smp) =>
+    `<li><a href="${esc(smp.source)}" target="_blank" rel="noopener">${esc(smp.credit)}</a>` +
+    `<span class="use">Sample (${esc(smp.part)}) · ${esc(smp.license)} · ${esc(smp.excerpt || 'excerpt')}</span></li>`).join(''));
+});
 document.getElementById('helpBtn').addEventListener('click', () => help.showModal());
 document.getElementById('helpClose').addEventListener('click', () => help.close());
 help.addEventListener('click', (e) => { if (e.target === help) help.close(); });

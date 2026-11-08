@@ -22,6 +22,7 @@
       <div class="toggles">
         <button class="toggle" id="detailToggle" aria-pressed="false" title="Show Hz values, grids and extra IPA vowels">Detail</button>
         <button class="toggle" id="quarterToggle" aria-pressed="false" title="Label quarter-tone pitches">¼ tones</button>
+        <button class="toggle" id="samplesToggle" aria-pressed="false" title="Listen to aria excerpts for each voice part">Samples</button>
         <button class="toggle" id="synthToggle" aria-pressed="false" title="Hear a synthesized voice with your own F0, F1, F2, F3 and volume">Synthesize</button>
         <button class="toggle" id="calibToggle" aria-pressed="false" title="Record your own vowels">Calibrate</button>
       </div>
@@ -57,7 +58,7 @@
     <section class="panel vowels">
       <div class="panel-label">Vowel <span class="muted">· F1 × F2</span></div>
       <canvas id="mapcanvas"></canvas>
-      <div id="mapHint" class="map-hint" hidden>High pitch — vowel reading is approximate</div>
+      <div id="mapHint" class="map-hint" hidden>High pitch: closed vowels (i, u, e, o) read as more open</div>
       <div id="calBadge" class="cal-badge" hidden>Your vowels <button id="calReset" class="linkish">reset</button></div>
     </section>
 
@@ -67,6 +68,15 @@
       <div id="clipLamp" class="clip">CLIP</div>
     </section>
   </main>
+
+  <aside id="samplesPanel" class="cal-panel samples-panel" hidden aria-label="Aria samples">
+    <div class="cal-head">
+      <h2>Aria samples</h2>
+      <button id="samplesClose" class="icon-btn" aria-label="Close samples">×</button>
+    </div>
+    <ul id="samplesList" class="samples"></ul>
+    <p class="sample-note">Historic recordings with orchestra: readings are noisier than a solo voice. Credits under “?”.</p>
+  </aside>
 
   <aside id="synthPanel" class="cal-panel synth-panel" hidden aria-label="Voice synthesizer">
     <div class="cal-head">
@@ -127,8 +137,10 @@
         formant region; <i>RING</i> compares energy at 2.5–3.5 kHz with 0.3–2 kHz.</p>
       <h3>Vowel · F1 × F2</h3>
       <p>Laid out like the IPA chart: front vowels left, close vowels top. Circles are the seven Italian vowels for
-        your voice type, or your own after <i>Calibrate</i>. Above ~520 Hz (high soprano notes) the reading is
-        approximate — the harmonics are too sparse to resolve formants.</p>
+        your voice type, or your own after <i>Calibrate</i>. A formant is only audible where a harmonic (a multiple of
+        F0) lands on it. Above ~300 Hz the analyzer fits the harmonic peaks directly; once F0 rises above a vowel's
+        F1 (≈400 Hz for i and u) there is no harmonic below F1 to reveal it, so closed vowels read as more open —
+        the same vowel blending listeners hear on high notes.</p>
       <h3>Synthesizer</h3>
       <p>Plays a synthesized vowel with exactly the pitch (F0), formants (F1–F3) and volume you set, and runs it
         through the analyzer. Use it to hear what a target vowel sounds like, or to check the displays against
@@ -149,6 +161,7 @@
       <p>Live Pitch and Resonance visualizer</p>
       <div class="landing-actions">
         <button id="startBtn" class="btn btn-primary">Start analyzing</button>
+        <button id="samplesBtn" class="btn btn-secondary">Listen to samples</button>
         <button id="synthBtn" class="btn btn-secondary">Synthesize a voice</button>
       </div>
       <p id="errorMsg" class="error" role="alert" hidden></p>
