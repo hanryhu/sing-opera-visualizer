@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pitch detector benchmark</title>
+<style>
+  body { font: 13px/1.45 ui-monospace, Consolas, monospace; background: #0b0d12; color: #dfe3ea; padding: 20px; }
+  h1 { font: 600 18px system-ui, sans-serif; } h2 { font: 600 14px system-ui, sans-serif; margin: 22px 0 6px; color: #9fb3c8; }
+  table { border-collapse: collapse; } td, th { padding: 3px 12px; text-align: right; border-bottom: 1px solid #222836; }
+  th { color: #8b93a7; font-weight: 500; } td:first-child, th:first-child { text-align: left; }
+  .win { color: #36e07f; } .note { color: #8b93a7; font-family: system-ui, sans-serif; max-width: 760px; }
+</style>
+</head>
+<body>
+<h1>Pitch detector benchmark — this app's YIN (+ low-partial refine) vs pitchy (McLeod Pitch Method)</h1>
+<p class="note">Raw per-frame detector output (2048-sample windows, 48 kHz), before the app's octave folding / median
+smoothing, so both detectors are compared on equal terms. Voicing: YIN aperiodicity &lt; 0.25 vs pitchy clarity ≥ 0.9.
+pitchy is loaded from a CDN for this page only.</p>
+<div id="out">running…</div>
+<script type="module">
+import { PitchDetector } from 'https://cdn.jsdelivr.net/npm/pitchy@4.1.0/+esm';
+import { yin, refinePitch } from './src/dsp/pitch.js';
+import { renderDemo } from './src/demo.js';
+import { VOICE_PRESETS } from './src/vowels.js';
+
+const FS = 48000, N = 2048, HOP = 800;
+const mpm = PitchDetector.forFloat32Array(N);
+const DET = {
+  yin: (fr) => { const r = yin(fr, FS); if (!(r.f0 >= 60 && r.f0 <= 1500) || r.aperiodicity >= 0.25) return 0; return refinePitch(fr, FS, r.f0); },
+  pitchy: (fr) => { const [p, c] = mpm.findPitch(fr, FS); return c >= 0.9 && p >= 60 && p <= 1500 ? p : 0; },
+};
+const cents = (a, b) => 1200 * Math.log2(a / b);
+const med = (a) => a.length ? [...a].sort((x, y) => x - y)[a.length >> 1] : NaN;
+const pct = (n, d) => (d ? (100 * n / d).toFixed(1) : '–') + '%';
+const frames = (x, from = 0, to = x.length) => { const out = []; for (let e = from + N; e <= to; e += HOP) out.push(x.subarray(e - N, e)); return out; };
+
+function fft(re, im) {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) { let b = n >> 1; for (; j & b; b >>= 1) j ^= b; j ^= b; if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; } }
+  for (let len = 2; len <= n; len <<= 1) { const a = -2 * Math.PI / len, wr = Math.cos(a), wi = Math.sin(a);
+    for (let i = 0; i < n; i += len) { let cr = 1, ci = 0;
+      for (let j = 0; j < len / 2; j++) { const k = i + j + len / 2, br = re[k] * cr - im[k] * ci, bi = re[k] * ci + im[k] * cr;
+        re[k] = re[i + j] - br; im[k] = im[i + j] - bi; re[i + j] += br; im[i + j] += bi; const t = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = t; } } }
+}
+function peakHz(fr) {
+  const M = 16384, re = new Float64Array(M), im = new Float64Array(M);
+  for (let i = 0; i < fr.length; i++) re[i] = fr[i] * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / (fr.length - 1)));
+  fft(re, im); const bin = FS / M, mag = (k) => re[k] * re[k] + im[k] * im[k];
+  let bi = 0, bm = 0; for (let k = Math.floor(200 / bin); k < 5000 / bin; k++) { const m = mag(k); if (m > bm) { bm = m; bi = k; } }
+  const a = Math.log(mag(bi - 1) + 1e-30), b = Math.log(bm + 1e-30), c = Math.log(mag(bi + 1) + 1e-30);
+  return (bi + 0.5 * (a - c) / (a - 2 * b + c)) * bin;
+}
+const decode = async (url) => (await new OfflineAudioContext(1, FS, FS).decodeAudioData(await (await fetch(url)).arrayBuffer())).getChannelData(0);
+
+/** Accuracy against known f0 per frame. */
+function accuracy(cases) {
+  const r = {};
+  for (const k of Object.keys(DET)) {
+    let tot = 0, det = 0, gross = 0; const err = [];
+    for (const { frames: fs, truth } of cases) fs.forEach((fr, i) => {
+      const t = typeof truth === 'function' ? truth(fr, i) : truth; if (!t) return;
+      tot++; const p = DET[k](fr); if (!p) return; det++;
+      const e = cents(p, t); if (Math.abs(e) > 50) gross++; else err.push(Math.abs(e));
+    });
+    r[k] = { detected: pct(det, tot), gross: pct(gross, det), medErr: med(err).toFixed(2) + '¢', p95: (err.length ? [...err].sort((a, b) => a - b)[Math.floor(err.length * 0.95)] : NaN).toFixed(1) + '¢' };
+  }
+  return r;
+}
+
+const results = {};
+// 1. Synthetic voices: every Italian vowel, steady pitch, both voice types
+{
+  const cases = [];
+  for (const voice of ['low', 'high']) {
+    const pitches = voice === 'low' ? [82, 110, 147, 196, 262, 349] : [196, 262, 349, 440, 587, 784, 1047];
+    for (const v of VOICE_PRESETS[voice].vowels) for (const f0 of pitches) {
+      const m = 69 + 12 * Math.log2(f0 / 440);
+      const d = renderDemo(FS, voice, { only: v.ipa, steady: true, notes: Array(7).fill(m), detune: Array(7).fill(0), segment: 0.3 });
+      cases.push({ frames: frames(d.samples, FS * 0.3, d.samples.length - FS * 0.2), truth: f0 });
+    }
+  }
+  results['Synthetic voice (7 vowels × 13 pitches, 82–1047 Hz)'] = accuracy(cases);
+}
+// 2. Synthetic voice with vibrato (demo melody): truth unknown per frame → use refined spectral check is unfair; skip.
+// 3. Piano-like inharmonic tones
+{
+  const cases = [];
+  for (const [midi, B] of [[45, 1e-4], [57, 2e-4], [60, 3e-4], [69, 4e-4], [72, 6e-4], [81, 1e-3]]) {
+    const f0 = 440 * Math.pow(2, (midi - 69) / 12), x = new Float32Array(FS);
+    for (let n = 1; n <= 40; n++) { const fn = n * f0 * Math.sqrt(1 + B * n * n); if (fn > FS / 2 - 500) break;
+      for (let i = 0; i < x.length; i++) x[i] += (1 / n) * Math.exp(-(1.5 + n * 0.3) * i / FS) * Math.sin(2 * Math.PI * fn * i / FS); }
+    cases.push({ frames: frames(x, FS * 0.1, FS * 0.8), truth: f0 });
+  }
+  const r = accuracy(cases);
+  // signed bias too
+  for (const k of Object.keys(DET)) { const e = []; for (const c of cases) for (const fr of c.frames) { const p = DET[k](fr); if (p) e.push(cents(p, c.truth)); } r[k].bias = '+' + med(e).toFixed(1) + '¢'; }
+  results['Piano-like tones (A2–A5, realistic inharmonicity)'] = r;
+}
+// 4. User's whistle recording (truth = spectral peak where the whistle is present)
+try {
+  const x = await decode('.qa/whistle.ogg');
+  const fs = frames(x); const truth = fs.map((fr) => { let s = 0; for (const v of fr) s += v * v; return 10 * Math.log10(s / fr.length + 1e-12) > -58 ? peakHz(fr) : 0; });
+  const t2 = truth.map((t) => (t > 1000 && t < 1400 ? t : 0));
+  results['Whistle recording (~1180 Hz, quiet)'] = accuracy([{ frames: fs, truth: (fr, i) => t2[i] }]);
+} catch { results['Whistle recording'] = { note: { detected: 'file not found (.qa/whistle.ogg is local only)' } }; }
+// 5. Aria stems: no ground truth → voiced share + frame-to-frame jumps > 1 semitone
+{
+  const { SAMPLES } = await import('./src/samples.js');
+  const r = {};
+  for (const k of Object.keys(DET)) {
+    let fr = 0, v = 0, jumps = 0, pairs = 0;
+    for (const s of SAMPLES) { const x = await decode(s.analysisFiles[0]); let prev = 0;
+      for (const f of frames(x)) { fr++; const p = DET[k](f); if (p) { v++; if (prev) { pairs++; if (Math.abs(cents(p, prev)) > 100) jumps++; } prev = p; } else prev = 0; } }
+    r[k] = { detected: pct(v, fr) + ' voiced', jumps: pct(jumps, pairs) + ' jumps' };
+  }
+  results['Six aria clips (vocal stems; lower jumps = steadier)'] = r;
+}
+// 6. False notes on non-musical input
+{
+  const L = (db) => Math.pow(10, db / 20) * Math.SQRT2, n = FS * 2, mk = (f) => Float32Array.from({ length: n }, (_, i) => f(i));
+  const sigs = {
+    silence: mk(() => (Math.random() - 0.5) * L(-68)),
+    'noise −40 dB': mk(() => (Math.random() - 0.5) * L(-40) * 1.7),
+    'hum 50 Hz': mk((i) => L(-50) * (Math.sin(2 * Math.PI * 50 * i / FS) + 0.3 * Math.sin(2 * Math.PI * 150 * i / FS))),
+  };
+  const r = {};
+  for (const k of Object.keys(DET)) { const parts = []; for (const [name, x] of Object.entries(sigs)) { const fs = frames(x); parts.push(`${name} ${fs.filter((f) => DET[k](f)).length}/${fs.length}`); } r[k] = { falseNotes: parts.join(', ') }; }
+  results['False notes (should be 0)'] = r;
+}
+// 7. Speed
+{
+  const x = renderDemo(FS, 'low', { only: 'a', steady: true }).samples, fs = frames(x).slice(0, 300), r = {};
+  for (const k of Object.keys(DET)) { const t0 = performance.now(); for (const f of fs) DET[k](f); r[k] = { msPerFrame: ((performance.now() - t0) / fs.length).toFixed(3) + ' ms' }; }
+  results['Speed (per 2048-sample frame)'] = r;
+}
+
+// render
+document.getElementById('out').innerHTML = Object.entries(results).map(([title, r]) => {
+  const cols = [...new Set(Object.values(r).flatMap((o) => Object.keys(o)))];
+  return `<h2>${title}</h2><table><tr><th>detector</th>${cols.map((c) => `<th>${c}</th>`).join('')}</tr>` +
+    Object.entries(r).map(([k, o]) => `<tr><td>${k}</td>${cols.map((c) => `<td>${o[c] ?? ''}</td>`).join('')}</tr>`).join('') + '</table>';
+}).join('');
+window.__bench = results;
+</script>
+</body>
+</html>
