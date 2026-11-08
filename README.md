@@ -24,6 +24,12 @@ The mic needs a secure context: `localhost` or HTTPS.
 
 Dev: `?devtest` runs the synthetic melody (vibrato, tuning errors) silently; `?devtest=a` sustains a single vowel; `window.__va.demo('e')` switches it (calibration QA).
 
+## Samples
+
+**Samples** plays a 20–30 s looping excerpt per voice part (bass → soprano) through the analyzer: historic
+Verdi recordings from ICBSA via Wikimedia Commons, CC BY-SA 4.0 — see [samples/CREDITS.md](samples/CREDITS.md).
+Old acoustic recordings and orchestra make vowel readings noisier than a solo voice. Dev: `?devsample=tenor` (silent).
+
 ## Layout
 
 ```

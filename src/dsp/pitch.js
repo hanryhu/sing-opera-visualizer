@@ -9,12 +9,14 @@ export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A',
 export function yin(buf, sampleRate, fmin = 60, fmax = 1500, threshold = 0.15) {
   const n = buf.length;
   const tauMin = Math.max(2, Math.floor(sampleRate / fmax));
-  const tauMax = Math.min(Math.floor(sampleRate / fmin), Math.floor(n / 2));
-  const w = n - tauMax;
+  const tauMax = Math.min(Math.floor(sampleRate / fmin), Math.floor(n / 2) - 1);
+  // Window leaves room for lags up to tauMax + 1 (needed by the interpolation). Every lag must be
+  // computed: an unfilled d[tau] = 0 would read as a perfect match and snap pitch to fmin.
+  const w = n - tauMax - 1;
   const d = new Float32Array(tauMax + 2);
 
   // Difference function
-  for (let tau = 1; tau <= tauMax + 1 && tau < n - w; tau++) {
+  for (let tau = 1; tau <= tauMax + 1; tau++) {
     let sum = 0;
     for (let i = 0; i < w; i++) {
       const diff = buf[i] - buf[i + tau];

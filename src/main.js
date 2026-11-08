@@ -11,7 +11,7 @@ const FFT = 4096;
 const PARAMS = new URLSearchParams(location.search);
 // Dev only: ?devtest autostarts the synthetic melody silently for visual QA
 // (?devtest=a sustains one vowel, for calibration QA).
-const MUTE_DEMO = PARAMS.has('devtest') || PARAMS.has('devsynth'); // dev URLs are silent
+const MUTE_DEMO = PARAMS.has('devtest') || PARAMS.has('devsynth') || PARAMS.has('devsample'); // dev URLs are silent
 const $ = (id) => document.getElementById(id);
 const els = {
   landing: $('landing'), startBtn: $('startBtn'), error: $('errorMsg'),
@@ -90,6 +90,8 @@ loadSamples().then((list) => {
     playingId: () => (session?.mode === 'sample' ? session.sample.id : null),
   });
   document.getElementById('samplesBtn').addEventListener('click', () => { els.landing.hidden = true; samplesUI.open(); });
+  const dev = list.find((x) => x.id === PARAMS.get('devsample'));
+  if (dev) { samplesUI.open(); start('sample', dev).then(() => samplesUI.render()); }
 });
 els.calReset.addEventListener('click', () => {
   try { localStorage.removeItem(`va.calib.${voice}`); } catch { /* ignore */ }
@@ -115,10 +117,13 @@ async function start(mode, sample) {
       const buf = await ctx.decodeAudioData(await res.arrayBuffer());
       const src = ctx.createBufferSource();
       src.buffer = buf;
+      src.loop = true; // short clips loop until stopped (or the tab is hidden)
       src.connect(analyser);
-      const out = ctx.createGain();
-      out.gain.value = 0.9;
-      src.connect(out).connect(ctx.destination);
+      if (!MUTE_DEMO) {
+        const out = ctx.createGain();
+        out.gain.value = 0.9;
+        src.connect(out).connect(ctx.destination);
+      }
       src.onended = () => { if (session?.src === src) { stop(true); samplesUI?.render(); } };
       src.start();
       session.src = src;
