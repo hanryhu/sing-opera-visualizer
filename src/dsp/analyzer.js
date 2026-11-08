@@ -1,6 +1,6 @@
 // Per-frame analysis pipeline + smoothing.
 
-import { yin, freqToMidi } from './pitch.js';
+import { yin, freqToMidi, refinePitch } from './pitch.js';
 import { estimateFormants, estimateFormantsHarmonic } from './formants.js';
 
 // Above this F0 the harmonics are too sparse for plain LPC; fit the harmonic peaks (DAP) instead.
@@ -69,7 +69,8 @@ export class Analyzer {
       const { f0, aperiodicity } = yin(frame.subarray(tail), this.sr);
       if (f0 >= 60 && f0 <= 1500 && aperiodicity < MAX_APERIODICITY) {
         out.voiced = true;
-        let midi = freqToMidi(f0, this.a4);
+        // Remove the sharp bias from inharmonic sources (piano) by re-measuring on the low partials
+        let midi = freqToMidi(refinePitch(frame.subarray(tail), this.sr, f0), this.a4);
         // Pitch cleanup. Recent raw readings (reset after a gap in voicing):
         if (t - this.lastVoicedT > HOLD) this.rawHist = [];
         this.rawHist = this.rawHist || [];

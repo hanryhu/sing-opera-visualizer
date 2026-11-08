@@ -97,3 +97,31 @@ export function stepName(step) {
   return step - base > 0.25 ? name + '↑' : name;
 }
 export const stepOctave = (step) => Math.floor(Math.floor(step + 1e-6) / 12) - 1;
+
+/**
+ * Re-estimate f0 on a low-passed copy of the frame (zero-phase, cutoff ≈ 3.5·f0).
+ * Stiff strings (piano) have partials sharper than n·f0; those upper partials pull a
+ * period-based estimate sharp. Keeping only the lowest few partials removes most of that
+ * bias. A voice's harmonics are exact multiples, so this changes nothing for singing.
+ */
+export function refinePitch(buf, sampleRate, f0) {
+  const fc = Math.min(3.5 * f0, 4000);
+  // RBJ biquad low-pass, Q = 0.707, applied forward then backward (no phase shift)
+  const w0 = (2 * Math.PI * fc) / sampleRate, alpha = Math.sin(w0) / (2 * Math.SQRT1_2), cw = Math.cos(w0);
+  const a0 = 1 + alpha;
+  const b0 = (1 - cw) / 2 / a0, b1 = (1 - cw) / a0, b2 = b0, a1 = (-2 * cw) / a0, a2 = (1 - alpha) / a0;
+  const run = (x) => {
+    const y = new Float32Array(x.length);
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (let i = 0; i < x.length; i++) {
+      const v = b0 * x[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+      x2 = x1; x1 = x[i]; y2 = y1; y1 = v; y[i] = v;
+    }
+    return y;
+  };
+  let y = run(run(buf).reverse()).reverse(); // two passes per direction = 4th-order slope
+  y = run(run(y).reverse()).reverse();
+  // Search only near the first estimate
+  const r = yin(y, sampleRate, f0 / 1.12, f0 * 1.12, 0.3);
+  return r.f0 && Math.abs(Math.log2(r.f0 / f0)) < 0.1 ? r.f0 : f0;
+}
