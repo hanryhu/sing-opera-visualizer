@@ -5,6 +5,7 @@ import { VOICE_PRESETS } from './vowels.js';
 import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter } from './ui/panels.js';
 
 const FFT = 4096;
+const MUTE_DEMO = new URLSearchParams(location.search).has('demo');
 const $ = (id) => document.getElementById(id);
 const els = {
   landing: $('landing'), startBtn: $('startBtn'), demoBtn: $('demoBtn'), error: $('errorMsg'),
@@ -83,11 +84,14 @@ function startDemoSource() {
   buf.copyToChannel(demo.samples, 0);
   const src = ctx.createBufferSource();
   src.buffer = buf;
-  src.loop = true;
-  const out = ctx.createGain();
-  out.gain.value = 0.5;
+  src.loop = false; // plays the phrase once, then the session ends
   src.connect(analyser);
-  src.connect(out).connect(ctx.destination);
+  if (!MUTE_DEMO) {
+    const out = ctx.createGain();
+    out.gain.value = 0.5;
+    src.connect(out).connect(ctx.destination);
+  }
+  src.onended = () => { if (session?.src === src) stop(); };
   src.start();
   session.src = src;
   session.demo = { samples: demo.samples, t0: ctx.currentTime, wall0: performance.now() };
@@ -204,5 +208,10 @@ function frame() {
 }
 requestAnimationFrame(frame);
 
-// Dev hook: ?demo autostarts the demo voice (useful for visual QA).
-if (new URLSearchParams(location.search).has('demo')) start('demo');
+// Never leave the demo voice playing in a background tab.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && session?.mode === 'demo') stop();
+});
+
+// Dev hook: ?demo autostarts the demo voice silently (analysis only) for visual QA.
+if (MUTE_DEMO) start('demo');

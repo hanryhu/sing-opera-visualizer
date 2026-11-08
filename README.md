@@ -10,7 +10,7 @@ python serve.py
 ```
 
 Open http://localhost:5173 → **Start analyzing** (mic) or **Try demo voice** (synthetic singer).
-`http://localhost:5173/?demo` auto-starts the demo. `test.html` runs an offline DSP self-test
+`http://localhost:5173/?demo` auto-starts the demo silently (analysis only, for visual QA). The demo plays the phrase once and stops if the tab is hidden. `test.html` runs an offline DSP self-test
 (pitch + formant accuracy on synthetic vowels).
 
 The mic needs a secure context: `localhost` or HTTPS.
