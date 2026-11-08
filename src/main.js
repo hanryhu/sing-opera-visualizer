@@ -7,9 +7,9 @@ import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter } from '
 
 const FFT = 4096;
 const PARAMS = new URLSearchParams(location.search);
-// URL autostart (silent, analysis only): ?demo = Demo mode, ?devtest = synthetic melody
+// Dev only: ?devtest autostarts the synthetic melody silently for visual QA
 // (?devtest=a sustains one vowel, for calibration QA).
-const MUTE_DEMO = PARAMS.has('demo') || PARAMS.has('devtest');
+const MUTE_DEMO = PARAMS.has('devtest');
 const $ = (id) => document.getElementById(id);
 const els = {
   landing: $('landing'), startBtn: $('startBtn'), error: $('errorMsg'),
@@ -41,7 +41,7 @@ function setVoice(v) {
   store.set('va.voice', v);
   document.querySelectorAll('.segmented button').forEach((b) =>
     b.setAttribute('aria-checked', String(b.dataset.voice === v)));
-  if (session?.mode === 'demo' || session?.mode === 'test') startDemoSource();
+  if (session?.mode === 'demo') startDemoSource();
   refreshLandmarks();
   calib?.voiceChanged();
 }
@@ -106,7 +106,7 @@ async function start(mode) {
     els.landing.hidden = true;
     els.stopBtn.hidden = false;
     els.chip.hidden = false;
-    els.chip.textContent = mode === 'mic' ? 'Listening' : mode === 'test' ? 'Demo mode' : 'Demo melody';
+    els.chip.textContent = mode === 'mic' ? 'Listening' : 'Dev synth';
     resetHistory();
   } catch (err) {
     stop(true);
@@ -117,8 +117,7 @@ async function start(mode) {
 function startDemoSource(only = PARAMS.get('devtest') || undefined) {
   const { ctx, analyser } = session;
   if (session.src) { try { session.src.stop(); } catch { /* already stopped */ } }
-  const steady = session.mode === 'test';
-  const demo = renderDemo(ctx.sampleRate, voice, { only, steady });
+  const demo = renderDemo(ctx.sampleRate, voice, { only });
   const buf = ctx.createBuffer(1, demo.samples.length, ctx.sampleRate);
   buf.copyToChannel(demo.samples, 0);
   const src = ctx.createBufferSource();
@@ -165,7 +164,6 @@ function showError(err) {
 }
 
 els.startBtn.addEventListener('click', () => start('mic'));
-document.getElementById('testBtn').addEventListener('click', () => start('test'));
 els.stopBtn.addEventListener('click', () => stop());
 
 /* ---------------- analysis + render loop ---------------- */
@@ -264,12 +262,11 @@ requestAnimationFrame(frame);
 
 // Never leave the demo voice playing in a background tab.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && (session?.mode === 'demo' || session?.mode === 'test')) stop();
+  if (document.hidden && session?.mode === 'demo') stop();
 });
 
 // Autostart from URL (see MUTE_DEMO above).
-if (PARAMS.has('demo')) start('test');
-else if (PARAMS.has('devtest')) start('demo');
+if (PARAMS.has('devtest')) start('demo');
 
 /* ---------------- help ---------------- */
 const help = document.getElementById('helpDialog');

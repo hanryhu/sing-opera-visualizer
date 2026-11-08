@@ -38,7 +38,7 @@ class Resonator {
  */
 export function renderDemo(fs, voice = 'low', opts = {}) {
   const preset = VOICE_PRESETS[voice];
-  // opts.steady: test signal — one vowel, one pitch, no vibrato, constant level.
+  // opts.steady: one vowel, one pitch, no vibrato, constant level.
   // opts.only: sustain a single vowel (used for testing calibration)
   if (opts.steady) opts = { ...opts, only: opts.only || 'a' };
   const vowels = opts.only

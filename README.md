@@ -9,8 +9,8 @@ Static site, no build step, no dependencies. See [DESIGN.md](DESIGN.md) for the 
 python serve.py
 ```
 
-Open http://localhost:5173 → **Start analyzing** (mic) or **Demo mode** (steady synthesized voice).
-`?demo` auto-starts Demo mode silently (analysis only). Synthesized audio plays once and stops if the tab is hidden. `test.html` runs an offline DSP self-test
+Open http://localhost:5173 → **Start analyzing** (mic).
+`test.html` runs an offline DSP self-test
 (pitch + formant accuracy on synthetic vowels).
 
 The mic needs a secure context: `localhost` or HTTPS.
@@ -21,8 +21,6 @@ The mic needs a secure context: `localhost` or HTTPS.
 - **¼ tones**: quarter-tone steps (e.g. `A↑` = A quarter-sharp); in-tune band tightens to ±5¢.
 - **Calibrate**: record a e i o u (ɛ ɔ optional, else interpolated); saved per voice type in
   localStorage and used instead of the default landmarks. "reset" on the map badge reverts.
-
-**Demo mode** (landing page) plays a steady synthesized [a]: flat pitch line, fixed F3, one still dot.
 
 Dev: `?devtest` runs the synthetic melody (vibrato, tuning errors) silently; `?devtest=a` sustains a single vowel; `window.__va.demo('e')` switches it (calibration QA).
 
