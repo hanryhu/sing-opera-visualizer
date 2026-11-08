@@ -1,7 +1,7 @@
 import { Analyzer } from './dsp/analyzer.js';
-import { tuningState, nearestStep, stepName, stepOctave } from './dsp/pitch.js';
+import { tuningState, nearestStep, stepName, stepOctave, midiToFreq } from './dsp/pitch.js';
 import { renderDemo } from './demo.js';
-import { VOICE_PRESETS, extraVowels, roundingPair, SOURCES } from './vowels.js';
+import { VOICE_PRESETS, extraVowels, roundingPair, SOURCES, pitchAdjustedLandmarks } from './vowels.js';
 import { CalibrationUI, calibratedLandmarks } from './calibration.js';
 import { SynthUI } from './synth.js';
 import { SamplesUI, loadSamples, pickFile } from './sampleplayer.js';
@@ -51,7 +51,11 @@ document.querySelectorAll('button[data-voice]').forEach((b) =>
   b.addEventListener('click', () => setVoice(b.dataset.voice)));
 
 // Display options
-const view = { detail: store.get('va.detail', '0') === '1', quarter: store.get('va.quarter', '0') === '1' };
+const view = {
+  detail: store.get('va.detail', '0') === '1',
+  quarter: store.get('va.quarter', '0') === '1',
+  pitchAware: store.get('va.pitchAware', '1') === '1', // circles follow the sung pitch (resonance tuning)
+};
 function bindToggle(btn, k) {
   const sync = () => btn.setAttribute('aria-pressed', String(view[k]));
   btn.addEventListener('click', () => { view[k] = !view[k]; store.set(`va.${k}`, view[k] ? '1' : '0'); sync(); });
@@ -59,6 +63,7 @@ function bindToggle(btn, k) {
 }
 bindToggle(els.detailToggle, 'detail');
 bindToggle(els.quarterToggle, 'quarter');
+bindToggle(document.getElementById('pitchAwareToggle'), 'pitchAware');
 
 // Landmarks: the singer's calibrated vowels replace the defaults
 let landmarks = VOICE_PRESETS[voice].vowels, isCalibrated = false;
@@ -352,17 +357,20 @@ function frame() {
 
   // ---- Formants ----
   const cur = o?.f1 && o?.f2 ? { f1: o.f1, f2: o.f2 } : null;
+  // Pitch-aware landmarks: move circles the way trained singers tune resonances at this pitch
+  const sungF0 = o?.tracking ? midiToFreq(o.midiMean) : 0;
+  const shown = view.pitchAware && sungF0 ? pitchAdjustedLandmarks(landmarks, sungF0, voice) : landmarks;
   if (cur && o.voiced) formantTrail.push({ t: now, ...cur });
   if (o?.f3 && o.voiced) f3Trail.push({ t: now, f3: o.f3 });
   prune(formantTrail, now, 1.6);
   prune(f3Trail, now, 1.3);
   const uncertain = !!(o?.f0 && o.f0 > 400); // F0 above close-vowel F1: i/u read as more open
   els.mapHint.hidden = !(cur && uncertain);
-  drawVowelMap(surf.map, landmarks, cur, formantTrail, now, {
-    uncertain, detail: view.detail, calibrated: isCalibrated,
+  drawVowelMap(surf.map, shown, cur, formantTrail, now, {
+    uncertain, detail: view.detail, calibrated: isCalibrated, f0: sungF0,
     extras: view.detail ? extraVowels(voice) : [],
   });
-  if (cur && o.voiced) lastPair = roundingPair(cur.f1, cur.f2, landmarks) || lastPair;
+  if (cur && o.voiced) lastPair = roundingPair(cur.f1, cur.f2, shown) || lastPair;
   drawF3(surf.f3, o?.f3 || 0, f3Trail, o?.ring || 0, now, { ...view, pair: lastPair });
   calib.tick(o, now);
 

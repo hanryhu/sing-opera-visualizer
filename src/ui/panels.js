@@ -336,6 +336,32 @@ export function drawVowelMap(s, vowels, cur, trail, now, opts = {}) {
   const pts = vowels.map((v) => ({ ...v, x: xOf(v.f2), y: yOf(v.f1) }));
   const extras = (opts.extras || []).map((v) => ({ ...v, x: xOf(v.f2), y: yOf(v.f1), extra: true }));
 
+  // Harmonic lines: a formant can only show where a harmonic of the sung note falls.
+  // F1 is the vertical axis, so harmonics k·f0 are horizontal lines.
+  if (opts.f0) {
+    ctx.font = `600 10px ${C.ui}`; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+    for (let k = 1; k <= 3; k++) {
+      const f = k * opts.f0;
+      if (f < F1_LO || f > F1_HI) continue;
+      const y = yOf(f);
+      ctx.strokeStyle = rgba(C.accent, k === 1 ? 0.35 : 0.2); ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
+      ctx.beginPath(); ctx.moveTo(L - 10, y); ctx.lineTo(w - R + 10, y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = rgba(C.accent, 0.7);
+      ctx.fillText(D ? `H${k} ${Math.round(f)} Hz` : `H${k}`, w - R + 6, y - 2);
+    }
+  }
+
+  // Pitch-aware circles: faint ghost at the low-pitch (speech/calibrated) position + a guide line
+  for (const p of pts) {
+    if (!p.tuned || !p.base0) continue;
+    const gx = xOf(p.base0.f2), gy = yOf(p.base0.f1);
+    ctx.setLineDash([2, 3]); ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(gx, gy, r * 0.75, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(p.x, p.y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(207,213,225,.28)'; ctx.font = `${Math.round(r * 0.6)}px ${C.ipa}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(p.ipa, gx, gy);
+  }
+
   // Vowel space outline
   ctx.setLineDash([3, 5]);
   ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 1.2;
@@ -343,21 +369,23 @@ export function drawVowelMap(s, vowels, cur, trail, now, opts = {}) {
   pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
   ctx.stroke(); ctx.setLineDash([]);
 
-  // Nearest landmark (main or extra)
-  let active = null;
+  // Highlight every circle the dot is inside — overlapping (merged) vowels light up together,
+  // which is the honest answer at high pitch. Otherwise the nearest one if close.
+  const activeSet = new Set();
   if (cur) {
     const cx = xOf(cur.f2), cy = yOf(cur.f1);
-    let best = Infinity;
+    let best = Infinity, nearest = null;
     for (const p of [...pts, ...extras]) {
       const d = Math.hypot(p.x - cx, p.y - cy) * (p.extra ? 1.4 : 1);
-      if (d < best) { best = d; active = p; }
+      if (d <= r * 1.05) activeSet.add(p);
+      if (d < best) { best = d; nearest = p; }
     }
-    if (best > r * 1.5) active = null;
+    if (!activeSet.size && best <= r * 1.5) activeSet.add(nearest);
   }
 
   // Extra IPA landmarks (Detailed UI): small, no fill
   for (const p of extras) {
-    const on = p === active;
+    const on = activeSet.has(p);
     ctx.fillStyle = on ? C.green : 'rgba(207,213,225,.5)';
     ctx.font = `${on ? 600 : 400} ${Math.round(r * 0.7)}px ${C.ipa}`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -366,7 +394,7 @@ export function drawVowelMap(s, vowels, cur, trail, now, opts = {}) {
   }
 
   for (const p of pts) {
-    const on = p === active;
+    const on = activeSet.has(p);
     const cal = !!opts.calibrated;
     ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
     ctx.fillStyle = on ? rgba(C.green, 0.16) : cal ? 'rgba(124,196,255,.10)' : 'rgba(124,196,255,.05)';

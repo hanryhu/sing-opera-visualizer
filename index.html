@@ -62,7 +62,10 @@
       <div class="panel-label">Vowel <span class="muted">· F1 × F2</span></div>
       <canvas id="mapcanvas"></canvas>
       <div id="mapHint" class="map-hint" hidden>High pitch: closed vowels (i, u, e, o) read as more open</div>
-      <div id="calBadge" class="cal-badge" hidden>Your vowels <button id="calReset" class="linkish">reset</button></div>
+      <div class="vowel-tools">
+        <div id="calBadge" class="cal-badge" hidden>Your vowels <button id="calReset" class="linkish">reset</button></div>
+        <button id="pitchAwareToggle" class="toggle mini" aria-pressed="true" title="Move vowel circles with the sung pitch, the way trained singers tune their resonances (see ? for sources)">Follow pitch</button>
+      </div>
     </section>
 
     <section class="panel meter">
@@ -144,6 +147,12 @@
         F0) lands on it. Above ~300 Hz the analyzer fits the harmonic peaks directly; once F0 rises above a vowel's
         F1 (≈400 Hz for i and u) there is no harmonic below F1 to reveal it, so closed vowels read as more open —
         the same vowel blending listeners hear on high notes.</p>
+      <h3>Follow pitch</h3>
+      <p>Trained singers move their resonances as they sing higher so a harmonic stays on a resonance: F1 is
+        raised to follow the note once the note passes it, high voices pull F2 up to the 2nd harmonic, and low voices
+        tune F1 to the 2nd harmonic near the top of their range. With <i>Follow pitch</i> on, the circles move this
+        way; faint ghosts mark their low-pitch positions and dotted lines (H1, H2, H3) mark the harmonics. Where
+        vowels merge, every circle the dot is inside lights up — at that pitch the sound can't tell them apart.</p>
       <h3>Synthesizer</h3>
       <p>Plays a synthesized vowel with exactly the pitch (F0), formants (F1–F3) and volume you set, and runs it
         through the analyzer. Use it to hear what a target vowel sounds like, or to check the displays against
