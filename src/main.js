@@ -293,7 +293,7 @@ els.stopBtn.addEventListener('click', () => { stop(); samplesUI?.render(); });
 const timeBuf = new Float32Array(FFT);
 const specBuf = new Float32Array(FFT / 2);
 let pitchHist = [], formantTrail = [], f3Trail = [], levelHist = [], lastPair = null;
-let lastFrameT = 0, viewCenter = 60, peakHold = -100, peakHoldT = 0, clipT = -10;
+let lastDistortT = -10, lastFrameT = 0, viewCenter = 60, peakHold = -100, peakHoldT = 0, clipT = -10;
 function resetHistory() { pitchHist = []; formantTrail = []; f3Trail = []; levelHist = []; lastPair = null; }
 
 function readFrame(now) {
@@ -364,7 +364,13 @@ function frame() {
   if (o?.f3 && o.voiced) f3Trail.push({ t: now, f3: o.f3 });
   prune(formantTrail, now, 1.6);
   prune(f3Trail, now, 1.3);
-  const uncertain = !!(o?.f0 && o.f0 > 400); // F0 above close-vowel F1: i/u read as more open
+  if (o?.distorted) lastDistortT = now;
+  const tooLoud = now - lastDistortT < 0.6;
+  const highPitch = !!(o?.f0 && o.f0 > 400); // F0 above close-vowel F1: i/u read as more open
+  const uncertain = tooLoud || highPitch;
+  els.mapHint.textContent = tooLoud
+    ? 'Too loud — input is clipping, vowel reading paused. Lower mic level or step back.'
+    : 'High pitch: closed vowels (i, u, e, o) read as more open';
   els.mapHint.hidden = !(cur && uncertain);
   drawVowelMap(surf.map, shown, cur, formantTrail, now, {
     uncertain, detail: view.detail, calibrated: isCalibrated, f0: sungF0,

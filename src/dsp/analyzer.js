@@ -33,6 +33,8 @@ class Track {
     return this.value;
   }
   get(t) { return this.lastT >= 0 && t - this.lastT <= HOLD ? this.value : 0; }
+  /** Keep the last good value alive without a new reading (e.g. while the input is clipping). */
+  touch(t) { if (this.value && this.lastT >= 0 && t - this.lastT <= HOLD) this.lastT = t; }
 }
 
 export class Analyzer {
@@ -54,21 +56,28 @@ export class Analyzer {
    */
   process(frame, spectrumDb, t) {
     // Level
-    let sum = 0, peak = 0;
+    let sum = 0, peak = 0, flat = 0, run = 0;
     const tail = frame.length - 2048;
     for (let i = tail; i < frame.length; i++) {
       const v = frame[i];
       sum += v * v;
       const a = Math.abs(v);
       if (a > peak) peak = a;
+      // Hard clipping leaves runs of identical samples at high level; a real voice (or even a
+      // pure whistle) never holds perfectly still like that.
+      if (a > 0.3 && Math.abs(v - frame[i - 1]) < 1e-6) { if (++run >= 2) flat++; } else run = 0;
     }
     const rms = Math.sqrt(sum / 2048);
     const rmsDb = 20 * Math.log10(rms + 1e-9);
     const peakDb = 20 * Math.log10(peak + 1e-9);
     const clipped = peak >= 0.99;
+    // Distortion: clipped peaks or flat-topped waveform. Flattened peaks add harmonics the voice
+    // never made, which reads as a falsely high F2 (e.g. [u] jumping toward [i]), so formant
+    // readings from these frames are discarded; pitch is still fine (clipping keeps the period).
+    const distorted = clipped || flat >= 3;
 
     const out = {
-      t, rmsDb, peakDb, clipped, voiced: false,
+      t, rmsDb, peakDb, clipped, distorted, voiced: false,
       f0: 0, midiRaw: 0, midiMean: 0, f1: 0, f2: 0, f3: 0, ring: 0,
     };
 
@@ -107,7 +116,8 @@ export class Analyzer {
 
         let fm = out.f0 > DAP_F0 ? estimateFormantsHarmonic(frame, this.sr, out.f0) : null;
         if (!fm || !fm.f1 || !fm.f2) fm = estimateFormants(frame, this.sr); // fall back to LPC
-        if (fm) {
+        if (distorted) { this.f1.touch(t); this.f2.touch(t); this.f3.touch(t); }
+        else if (fm) {
           this.f1.push(fm.f1, t);
           this.f2.push(fm.f2, t);
           this.f3.push(fm.f3, t);
