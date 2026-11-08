@@ -10,7 +10,7 @@ python serve.py
 ```
 
 Open http://localhost:5173 → **Start analyzing** (mic) or **Demo mode** (steady synthesized voice).
-`http://localhost:5173/?demo` auto-starts the demo silently (analysis only, for visual QA). The demo plays the phrase once and stops if the tab is hidden. `test.html` runs an offline DSP self-test
+`?demo` auto-starts Demo mode silently (analysis only). Synthesized audio plays once and stops if the tab is hidden. `test.html` runs an offline DSP self-test
 (pitch + formant accuracy on synthetic vowels).
 
 The mic needs a secure context: `localhost` or HTTPS.
@@ -24,7 +24,7 @@ The mic needs a secure context: `localhost` or HTTPS.
 
 **Demo mode** (landing page) plays a steady synthesized [a]: flat pitch line, fixed F3, one still dot.
 
-Dev: `?test` starts Demo mode silently; `?demo` plays the synthetic melody (vibrato, tuning errors) silently; `?demo=a` sustains a single vowel; `window.__va.demo('e')` switches it (calibration QA).
+Dev: `?devtest` runs the synthetic melody (vibrato, tuning errors) silently; `?devtest=a` sustains a single vowel; `window.__va.demo('e')` switches it (calibration QA).
 
 ## Layout
 

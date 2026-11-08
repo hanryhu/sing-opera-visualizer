@@ -7,7 +7,9 @@ import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter } from '
 
 const FFT = 4096;
 const PARAMS = new URLSearchParams(location.search);
-const MUTE_DEMO = PARAMS.has('demo') || PARAMS.has('test'); // dev URLs play silently
+// URL autostart (silent, analysis only): ?demo = Demo mode, ?devtest = synthetic melody
+// (?devtest=a sustains one vowel, for calibration QA).
+const MUTE_DEMO = PARAMS.has('demo') || PARAMS.has('devtest');
 const $ = (id) => document.getElementById(id);
 const els = {
   landing: $('landing'), startBtn: $('startBtn'), error: $('errorMsg'),
@@ -112,10 +114,10 @@ async function start(mode) {
   }
 }
 
-function startDemoSource(only = PARAMS.get('demo') || undefined) {
+function startDemoSource(only = PARAMS.get('devtest') || undefined) {
   const { ctx, analyser } = session;
   if (session.src) { try { session.src.stop(); } catch { /* already stopped */ } }
-  const steady = session.mode === 'test' || PARAMS.has('test');
+  const steady = session.mode === 'test';
   const demo = renderDemo(ctx.sampleRate, voice, { only, steady });
   const buf = ctx.createBuffer(1, demo.samples.length, ctx.sampleRate);
   buf.copyToChannel(demo.samples, 0);
@@ -265,9 +267,9 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden && (session?.mode === 'demo' || session?.mode === 'test')) stop();
 });
 
-// Dev hook: ?demo autostarts the demo voice silently (analysis only) for visual QA.
-if (PARAMS.has('test')) start('test');
-else if (PARAMS.has('demo')) start('demo');
+// Autostart from URL (see MUTE_DEMO above).
+if (PARAMS.has('demo')) start('test');
+else if (PARAMS.has('devtest')) start('demo');
 
 /* ---------------- help ---------------- */
 const help = document.getElementById('helpDialog');
