@@ -109,28 +109,53 @@ async function start(mode, sample) {
     const analyser = ctx.createAnalyser();
     analyser.fftSize = FFT;
     analyser.smoothingTimeConstant = 0;
-    session = { ctx, analyser, mode, analyzer: new Analyzer(ctx.sampleRate) };
+    const me = { ctx, analyser, mode, analyzer: new Analyzer(ctx.sampleRate) };
+    session = me;
+    // Loading is async; if the session is stopped meanwhile (tab hidden, another source), abandon quietly.
+    const cancelled = () => { if (session === me) return false; ctx.close().catch(() => {}); return true; };
 
     if (mode === 'sample') {
-      const res = await fetch(pickFile(sample));
-      if (!res.ok) throw new Error(`could not load ${sample.part} sample`);
-      const buf = await ctx.decodeAudioData(await res.arrayBuffer());
+      // Listening: the original recording. Analysis: an isolated-vocal stem played in sync
+      // (offline source separation), so the orchestra doesn't pollute pitch/formants.
+      const load = async (url) => ctx.decodeAudioData(await (await fetch(url)).arrayBuffer());
+      const playBuf = await load(pickFile(sample));
+      if (cancelled()) return;
+      let anaBuf = null;
+      if (sample.analysisFiles) {
+        try { anaBuf = await load(pickFile({ files: sample.analysisFiles })); } catch { anaBuf = null; }
+        if (cancelled()) return;
+      }
       const src = ctx.createBufferSource();
-      src.buffer = buf;
+      src.buffer = playBuf;
       src.loop = true; // short clips loop until stopped (or the tab is hidden)
-      src.connect(analyser);
       if (!MUTE_DEMO) {
         const out = ctx.createGain();
         out.gain.value = 0.9;
         src.connect(out).connect(ctx.destination);
       }
+      let ana = null;
+      if (anaBuf) {
+        ana = ctx.createBufferSource();
+        ana.buffer = anaBuf;
+        ana.loop = true;
+        ana.connect(analyser);
+      } else {
+        // Fallback: band-limit the original to the voice range before analysis
+        const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 100;
+        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5000;
+        src.connect(hp).connect(lp).connect(analyser);
+      }
       src.onended = () => { if (session?.src === src) { stop(true); samplesUI?.render(); } };
-      src.start();
+      const t0 = ctx.currentTime + 0.05; // same clock tick for both → sample-aligned
+      src.start(t0);
+      ana?.start(t0);
       session.src = src;
+      session.ana = ana;
       session.sample = sample;
       if (sample.voice && sample.voice !== voice) setVoice(sample.voice);
     } else if (mode === 'synth') {
       await ctx.audioWorklet.addModule('src/synth-worklet.js');
+      if (cancelled()) return;
       const node = new AudioWorkletNode(ctx, 'formant-synth', { outputChannelCount: [1] });
       node.connect(analyser);
       if (!MUTE_DEMO) {
@@ -146,6 +171,7 @@ async function start(mode, sample) {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 },
       });
+      if (cancelled()) { stream.getTracks().forEach((t) => t.stop()); return; }
       session.stream = stream;
       ctx.createMediaStreamSource(stream).connect(analyser);
     } else {
@@ -192,6 +218,7 @@ function stop(silent) {
   if (session) {
     session.stream?.getTracks().forEach((t) => t.stop());
     try { session.src?.stop(); } catch { /* noop */ }
+    try { session.ana?.stop(); } catch { /* noop */ }
     session.ctx.close().catch(() => {});
   }
   session = null;
