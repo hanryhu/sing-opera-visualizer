@@ -566,42 +566,37 @@ export function drawMeter(s, rmsDb, peakHoldDb, opts = {}, hist = [], now = 0) {
   const y = h < 90 ? h / 2 - 9 : 34;
   const xOf = (db) => x0 + ((Math.max(DB_MIN, Math.min(0, db)) - DB_MIN) / -DB_MIN) * (x1 - x0);
 
-  // ---- bar ----
-  roundRect(ctx, x0, y, x1 - x0, bh, bh / 2); ctx.fillStyle = C.track; ctx.fill();
-  ctx.save();
-  roundRect(ctx, x0, y, x1 - x0, bh, bh / 2); ctx.clip();
-  const lvl = xOf(rmsDb);
-  const seg = (a, b, col) => {
-    const xa = xOf(a), xb = Math.min(xOf(b), lvl);
-    if (xb > xa) { ctx.fillStyle = col; ctx.fillRect(xa, y, xb - xa, bh); }
-  };
-  seg(DB_MIN, -45, C.faint);
-  seg(-45, -6, C.green);
-  seg(-6, 0, C.orange);
-  ctx.fillStyle = 'rgba(11,13,18,.55)';
-  for (let x = x0 + 6; x < x1; x += 6) ctx.fillRect(x, y, 1.5, bh);
-  ctx.restore();
-  if (peakHoldDb > DB_MIN) { ctx.fillStyle = '#fff'; ctx.fillRect(xOf(peakHoldDb) - 1, y - 3, 2, bh + 6); }
-
-  ctx.font = `500 10px ${C.ui}`; ctx.fillStyle = C.faint; ctx.textBaseline = 'top';
+  // ---- bar (Detail only; the history below already shows the level) ----
   if (D) {
-    for (const db of [-60, -45, -30, -18, -6, 0]) {
-      ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(xOf(db) - 0.5, y + bh + 2, 1, 4);
-      ctx.fillStyle = C.faint;
-      ctx.textAlign = db === -60 ? 'left' : db === 0 ? 'right' : 'center';
-      ctx.fillText(`${db} dB`, xOf(db), y + bh + 6);
+    roundRect(ctx, x0, y, x1 - x0, bh, bh / 2); ctx.fillStyle = C.track; ctx.fill();
+    ctx.save();
+    roundRect(ctx, x0, y, x1 - x0, bh, bh / 2); ctx.clip();
+    const lvl = xOf(rmsDb);
+    const seg = (a, b, col) => {
+      const xa = xOf(a), xb = Math.min(xOf(b), lvl);
+      if (xb > xa) { ctx.fillStyle = col; ctx.fillRect(xa, y, xb - xa, bh); }
+    };
+    seg(DB_MIN, -45, C.faint);
+    seg(-45, -6, C.green);
+    seg(-6, 0, C.orange);
+    ctx.fillStyle = 'rgba(11,13,18,.55)';
+    for (let x = x0 + 6; x < x1; x += 6) ctx.fillRect(x, y, 1.5, bh);
+    ctx.restore();
+    if (peakHoldDb > DB_MIN) { ctx.fillStyle = '#fff'; ctx.fillRect(xOf(peakHoldDb) - 1, y - 3, 2, bh + 6); }
+
+    ctx.font = `500 10px ${C.ui}`; ctx.fillStyle = C.faint; ctx.textBaseline = 'top';
+    if (D) {
+      for (const db of [-60, -45, -30, -18, -6, 0]) {
+        ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(xOf(db) - 0.5, y + bh + 2, 1, 4);
+        ctx.fillStyle = C.faint;
+        ctx.textAlign = db === -60 ? 'left' : db === 0 ? 'right' : 'center';
+        ctx.fillText(`${db} dB`, xOf(db), y + bh + 6);
+      }
     }
-  } else {
-    ctx.textAlign = 'left'; ctx.fillText('quiet', x0, y + bh + 6);
-    ctx.textAlign = 'center'; ctx.fillText('good', (xOf(-45) + xOf(-6)) / 2, y + bh + 6);
-    ctx.textAlign = 'right'; ctx.fillText('max', x1, y + bh + 6);
-    ctx.fillStyle = 'rgba(255,255,255,.15)';
-    ctx.fillRect(xOf(-45) - 0.5, y + bh + 2, 1, 4);
-    ctx.fillRect(xOf(-6) - 0.5, y + bh + 2, 1, 4);
   }
 
   // ---- history ----
-  const hy0 = y + bh + 30, hy1 = h - 12;
+  const hy0 = D ? y + bh + 30 : 30, hy1 = h - 12; // default view: history fills the panel
   if (hy1 - hy0 < 30) return;
   const span = 8; // seconds
   const hx = (t) => sweepX(t, now, span, x0, x1); // sweep, like the pitch trace
@@ -616,9 +611,11 @@ export function drawMeter(s, rmsDb, peakHoldDb, opts = {}, hist = [], now = 0) {
   ctx.strokeStyle = 'rgba(255,255,255,.12)';
   ctx.beginPath(); ctx.moveTo(x0, hyOf(-45)); ctx.lineTo(x1, hyOf(-45)); ctx.stroke();
   ctx.setLineDash([]);
-  ctx.font = `500 10px ${C.ui}`; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-  ctx.fillStyle = rgba(C.orange, 0.7); ctx.fillText(D ? '−6 dB' : 'loud', x0 + 6, hyOf(-6) - 2);
-  ctx.fillStyle = C.faint; ctx.fillText(D ? '−45 dB' : 'quiet', x0 + 6, hyOf(-45) - 2);
+  if (D) {
+    ctx.font = `500 10px ${C.ui}`; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillStyle = rgba(C.orange, 0.7); ctx.fillText('−6 dB', x0 + 6, hyOf(-6) - 2);
+    ctx.fillStyle = C.faint; ctx.fillText('−45 dB', x0 + 6, hyOf(-45) - 2);
+  }
 
   // Split into runs of increasing x (a run ends where the sweep wrapped or data was erased)
   const runs = [];
