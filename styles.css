@@ -397,6 +397,7 @@ body.synth-on #mapcanvas, body.synth-on #f3canvas { cursor: crosshair; touch-act
 .mic-ico { color: var(--faint); flex: none; }
 body[data-live="mic"] .mode-switch button[data-mode="mic"] .mic-ico { color: #fff; }
 .spk-ico { color: var(--faint); flex: none; }
+.mode-switch button[aria-checked="false"] .mic-ico, .mode-switch button[aria-checked="false"] .spk-ico { display: none; }
 body[data-live="synth"] .mode-switch button[data-mode="synth"] .spk-ico,
 body[data-live="listen"] .mode-switch button[data-mode="listen"] .spk-ico { color: #fff; }
 .icon-toggle { display: inline-grid; place-items: center; width: 34px; height: 32px; padding: 0; }
