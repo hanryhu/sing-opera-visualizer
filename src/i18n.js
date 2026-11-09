@@ -58,7 +58,7 @@ const ZH = {
   'in tune': '音准', 'a little sharp': '略高', 'a little flat': '略低', 'between notes': '介于两音之间',
   'sing a note': '唱一个音', 'waiting for a voice': '等待人声',
   'Too loud — input is clipping, vowel reading paused. Lower mic level or step back.': '太响：输入削波，元音读数暂停。请调低麦克风电平或离远一些。',
-  'High pitch: closed vowels (i, u, e, o) read as more open': '高音：闭元音（i、u、e、o）会显得更开',
+  'High pitch: F1 readings can be unreliable': '高音：F1 读数可能不可靠',
   'Detecting your typical pitch…': '正在检测你的常用音高…',
   'Detected High voice': '检测到高音声部', 'Detected Low voice': '检测到低音声部',
   'No microphone was found. Plug one in or check your system sound settings, then try again.': '未找到麦克风。请连接麦克风或检查系统声音设置后重试。',

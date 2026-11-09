@@ -577,7 +577,7 @@ function render() {
   const uncertain = tooLoud || highPitch;
   els.mapHint.textContent = t(tooLoud
     ? 'Too loud — input is clipping, vowel reading paused. Lower mic level or step back.'
-    : 'High pitch: closed vowels (i, u, e, o) read as more open');
+    : 'High pitch: F1 readings can be unreliable');
   els.mapHint.hidden = !(cur && uncertain);
   const synthOn = session?.mode === 'synth';
   drawVowelMap(surf.map, shown, cur, formantTrail, now, {
