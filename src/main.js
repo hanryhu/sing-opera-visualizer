@@ -65,7 +65,7 @@ function updateVoiceUI() {
   document.querySelectorAll('button[data-voicemode]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.voicemode === voiceMode)));
   if (els.voiceDetected) {
     els.voiceDetected.textContent = voiceMode === 'auto'
-      ? `${t(voice === 'high' ? 'Using High voice' : 'Using Low voice')} — ${autoNote ? `${t('your typical pitch')} ${autoNote}` : t('sing to detect')}`
+      ? (autoNote ? `${t(voice === 'high' ? 'Detected High voice' : 'Detected Low voice')} (${autoNote})` : t('Detecting your typical pitch…'))
       : t(VOICE_PRESETS[voice].hint);
   }
 }
