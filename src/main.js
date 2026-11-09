@@ -623,7 +623,7 @@ loadSamples().then((list) => {
     `<span class="use">Sample (${esc(smp.part)}) · ${esc(smp.license)} · ${esc(smp.excerpt || 'excerpt')}</span></li>`).join(''));
 });
 document.getElementById('helpBtn').addEventListener('click', () => help.showModal());
-// Language: 中文 / English button in the Help footer. Static text is translated by applyDom; these re-render the rest.
+// Language: 中文 / English row in the Settings menu, under Help. Static text is translated by applyDom; these re-render the rest.
 document.getElementById('langBtn').addEventListener('click', () => setLang(getLang() === 'zh' ? 'en' : 'zh'));
 onLang(() => {
   updateVoiceUI();
