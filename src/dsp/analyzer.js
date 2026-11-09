@@ -2,7 +2,7 @@
 
 import { yin, freqToMidi, refinePitch } from './pitch.js';
 import { estimateFormants, estimateFormantsHarmonic } from './formants.js';
-import { singersFormantLevel } from './ring.js';
+import { singersFormantLevel, predictedClusterCurve } from './ring.js';
 
 // Above this F0 the harmonics are too sparse for plain LPC; fit the harmonic peaks (DAP) instead.
 const DAP_F0 = 300;
@@ -48,6 +48,7 @@ export class Analyzer {
     this.ring = new Track(0.15);
     this.pitchHist = []; // {t, midi}
     this.lastVoicedT = -1;
+    this.clusterObs = null; this.clusterPred = null; this.clusterT = -1;
   }
 
   /**
@@ -130,6 +131,17 @@ export class Analyzer {
         if (!distorted && out.f0 < 600 && this.f1.value && this.f2.value) {
           const r = singersFormantLevel(frame, this.sr, out.f0, this.f1.value, this.f2.value);
           if (r && Number.isFinite(r.lsf)) this.ring.push(r.lsf + 100, t); // offset keeps it non-zero
+          // Cluster view: observed harmonic-peak curve + speech-like prediction, smoothed over ~150 ms
+          if (r?.cluster) {
+            const pred = predictedClusterCurve(this.f1.value, this.f2.value);
+            const a = this.clusterT >= 0 ? 1 - Math.exp(-Math.max(0, t - this.clusterT) / 0.15) : 1;
+            if (!this.clusterObs || t - this.clusterT > HOLD) { this.clusterObs = Float32Array.from(r.cluster); this.clusterPred = pred; }
+            else for (let i = 0; i < pred.length; i++) {
+              this.clusterObs[i] += (r.cluster[i] - this.clusterObs[i]) * a;
+              this.clusterPred[i] += (pred[i] - this.clusterPred[i]) * a;
+            }
+            this.clusterT = t;
+          }
         }
       }
     }
@@ -152,6 +164,7 @@ export class Analyzer {
     const r = this.ring.get(t);
     out.ring = r ? r - 100 : 0;
     out.tracking = out.midiMean > 0;
+    out.cluster = this.clusterObs && t - this.clusterT <= 0.5 ? { obs: this.clusterObs, pred: this.clusterPred } : null;
     return out;
   }
 

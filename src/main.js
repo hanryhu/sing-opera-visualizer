@@ -578,7 +578,7 @@ function render() {
     extras: view.detail ? extraVowels(voice) : [],
   });
   if (cur && o.voiced) lastPair = roundingPair(cur.f1, cur.f2, shown) || lastPair;
-  drawF3(surf.f3, o?.f3 || 0, f3Trail, o?.ring || 0, now, { ...view, pair: lastPair, target: synthOn ? synth.state.f3 : 0 });
+  drawF3(surf.f3, o?.f3 || 0, f3Trail, o?.ring || 0, now, { ...view, pair: lastPair, target: synthOn ? synth.state.f3 : 0, cluster: o?.cluster });
   calib.tick(o, now);
 
   // ---- Level ----

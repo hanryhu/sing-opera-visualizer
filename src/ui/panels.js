@@ -299,6 +299,12 @@ export function drawF3(s, f3, trail, ring, now, opts = {}) {
     }
   }
 
+  // Detail mode: spectrum shape 2–4.5 kHz (one tall narrow peak near 3 kHz = clustered F3–F5 = ring)
+  if (opts.detail && opts.cluster && wide) {
+    const px0 = Math.max(bx + barW + 170, w * 0.56), px1 = w - 16, py0 = barTop - 6, py1 = barBot - 4;
+    if (px1 - px0 >= 160 && py1 - py0 >= 70) drawCluster(ctx, opts.cluster, px0, px1, py0, py1);
+  }
+
   // Ring meter
   const ry = h - ringH + 6;
   ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(12, ry - 12, w - 24, 1);
@@ -327,6 +333,44 @@ export function drawF3(s, f3, trail, ring, now, opts = {}) {
       ctx.fillText(`${ring >= 0 ? '+' : ''}${ring.toFixed(0)} dB`, w - 14, ry + 12);
     }
   }
+}
+
+/** Spectrum envelope 2–4.5 kHz: your harmonic peaks (solid) vs a speech-like voice with the same vowel (dashed). */
+function drawCluster(ctx, cl, x0, x1, y0, y1) {
+  const FLO = 2000, FHI = 4500, DLO = -60, DHI = 10, n = cl.obs.length;
+  const xAt = (i) => x0 + (i / (n - 1)) * (x1 - x0);               // grid is log-spaced already
+  const xOfF = (f) => x0 + (Math.log(f / FLO) / Math.log(FHI / FLO)) * (x1 - x0);
+  const yOf = (db) => y1 - ((Math.max(DLO, Math.min(DHI, db)) - DLO) / (DHI - DLO)) * (y1 - y0);
+  ctx.save();
+  roundRect(ctx, x0 - 6, y0 - 16, x1 - x0 + 12, y1 - y0 + 34, 8);
+  ctx.fillStyle = 'rgba(255,255,255,.02)'; ctx.fill();
+  ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
+  // singer's-formant zone + 0 dB (L1) reference
+  ctx.fillStyle = rgba(C.green, 0.07); ctx.fillRect(xOfF(2800), y0, xOfF(3400) - xOfF(2800), y1 - y0);
+  ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(x0, yOf(0) - 0.5, x1 - x0, 1);
+  ctx.fillStyle = 'rgba(255,255,255,.05)'; ctx.fillRect(x0, yOf(-30) - 0.5, x1 - x0, 1);
+  // speech-like prediction (dashed)
+  ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(207,213,225,.55)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); for (let i = 0; i < n; i++) (i ? ctx.lineTo : ctx.moveTo).call(ctx, xAt(i), yOf(cl.pred[i])); ctx.stroke();
+  ctx.setLineDash([]);
+  // observed (solid, filled)
+  ctx.beginPath(); ctx.moveTo(xAt(0), y1);
+  for (let i = 0; i < n; i++) ctx.lineTo(xAt(i), yOf(cl.obs[i]));
+  ctx.lineTo(xAt(n - 1), y1); ctx.closePath();
+  ctx.fillStyle = rgba(C.accent, 0.16); ctx.fill();
+  ctx.beginPath(); for (let i = 0; i < n; i++) (i ? ctx.lineTo : ctx.moveTo).call(ctx, xAt(i), yOf(cl.obs[i]));
+  ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.stroke();
+  ctx.restore();
+  // labels
+  ctx.font = `600 9px ${C.ui}`; ctx.textBaseline = 'bottom'; ctx.textAlign = 'left'; ctx.fillStyle = C.muted;
+  ctx.fillText('SPECTRUM 2–4.5 kHz', x0, y0 - 4);
+  ctx.textAlign = 'right'; ctx.font = `500 9px ${C.ui}`;
+  ctx.fillStyle = C.accent; ctx.fillText('— you', x1 - 70, y0 - 4);
+  ctx.fillStyle = 'rgba(207,213,225,.7)'; ctx.fillText('- - speech-like', x1, y0 - 4);
+  ctx.textBaseline = 'top'; ctx.textAlign = 'center'; ctx.fillStyle = C.faint;
+  for (const f of [2000, 2500, 3000, 3500, 4000, 4500]) ctx.fillText(`${f / 1000}k`, xOfF(f), y1 + 3);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; ctx.fillStyle = C.faint;
+  ctx.fillText('L1', x0 + 2, yOf(0) - 1); ctx.fillText('−30 dB', x0 + 2, yOf(-30) - 1);
 }
 
 /* ------------------------------------------------------------------ */

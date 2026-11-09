@@ -63,6 +63,40 @@ export function predictedRelL3(F1, F2) {
   return rawRelL3(F1, F2) + CALIBRATION;
 }
 
+// ---- Cluster view (Detail mode): spectrum shape 2–4.5 kHz ----
+export const CLUSTER_LO = 2000, CLUSTER_HI = 4500, CLUSTER_N = 64;
+export const clusterFreq = (i) => CLUSTER_LO * Math.pow(CLUSTER_HI / CLUSTER_LO, i / (CLUSTER_N - 1));
+
+/** Predicted spectrum envelope (dB re L1) of a speech-like voice with these F1, F2, on the cluster grid. */
+export function predictedClusterCurve(F1, F2) {
+  const F3 = Math.max(2500, F2 + 500), F4 = Math.max(3500, F3 + 1000), F5 = Math.max(4500, F4 + 1000);
+  const F = [F1, F2, F3, F4, F5];
+  const l1 = envelopeDb(F1, F);
+  const out = new Float32Array(CLUSTER_N);
+  for (let i = 0; i < CLUSTER_N; i++) out[i] = envelopeDb(clusterFreq(i), F) - l1 + CALIBRATION;
+  return out;
+}
+
+/** Observed harmonic-peak curve (dB re L1) on the cluster grid: partials joined by straight lines. */
+function observedClusterCurve(spec, f0, L1) {
+  const pts = [];
+  for (let k = Math.max(1, Math.floor(CLUSTER_LO / f0) - 1); k * f0 <= CLUSTER_HI * 1.1; k++) {
+    const f = k * f0;
+    pts.push([f, peak(spec, f - f0 * 0.3, f + f0 * 0.3) - L1]);
+  }
+  if (pts.length < 2) return null;
+  const out = new Float32Array(CLUSTER_N);
+  let j = 0;
+  for (let i = 0; i < CLUSTER_N; i++) {
+    const f = clusterFreq(i);
+    while (j < pts.length - 2 && pts[j + 1][0] < f) j++;
+    const [fa, da] = pts[j], [fb, db] = pts[j + 1];
+    const u = Math.max(0, Math.min(1, (f - fa) / (fb - fa)));
+    out[i] = da + (db - da) * u;
+  }
+  return out;
+}
+
 /**
  * Singer's formant level L_SF in dB (≈0 = ordinary speech-like voice; ≥ 6 = singer's formant present).
  * @returns {{lsf:number, observed:number, predicted:number}|null}
@@ -77,5 +111,5 @@ export function singersFormantLevel(frame, sampleRate, f0, F1, F2) {
   const L3 = peak(spec, 2200, 3800);
   const observed = L3 - L1;
   const predicted = predictedRelL3(F1, F2);
-  return { lsf: observed - predicted, observed, predicted };
+  return { lsf: observed - predicted, observed, predicted, cluster: observedClusterCurve(spec, f0, L1) };
 }
