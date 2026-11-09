@@ -89,7 +89,7 @@ export function drawGauge(s, cents, rawCents, state, opts = {}) {
   for (const c of [-R, -R / 2, R / 2, R]) ctx.fillRect(x(c) - 0.5, y + 8, 1, 4);
   ctx.fillRect(x(0) - 0.5, y + 7, 1, 7);
   if (opts.detail) {
-    ctx.font = `500 9px ${C.ui}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.font = `500 10px ${C.ui}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     for (const c of [-R, -R / 2, 0, R / 2, R]) ctx.fillText(c > 0 ? `+${c}` : `${c}`, x(c), y + 15);
   }
 
@@ -156,7 +156,7 @@ export function drawTrace(s, hist, now, centerMidi, opts = {}) {
     ctx.fillStyle = isCur ? C.text : C.faint;
     if (showLabel) ctx.fillText(name, opts.detail ? left - 50 : left - 10, y);
     if (opts.detail && showLabel && (!isQuarter || rowPx > 30)) {
-      ctx.font = `400 10px ${C.ui}`; ctx.fillStyle = C.faint;
+      ctx.font = `400 11px ${C.ui}`; ctx.fillStyle = C.faint;
       ctx.fillText(midiToFreq(n, opts.a4).toFixed(1), left - 8, y);
     }
   }
@@ -278,11 +278,12 @@ export function drawF3(s, f3, trail, ring, now, opts = {}) {
 
   // Detailed: Hz scale on the left of the bar
   if (opts.detail) {
-    ctx.font = `500 9px ${C.ui}`; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.font = `500 ${bx < 40 ? 9 : 10}px ${C.ui}`; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; // phone column is narrow
     for (const f of [2000, 2500, 2800, 3000, 3400, 4000]) {
       const y = yOf(f);
       ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(bx - 5, y - 0.5, 4, 1);
-      ctx.fillStyle = C.faint; ctx.fillText(f >= 4000 ? '4k' : (f / 1000).toFixed(1) + 'k', bx - 8, y);
+      const lab = f >= 4000 ? '4k' : (f / 1000).toFixed(1) + 'k';
+      if (ctx.measureText(lab).width <= bx - 10) { ctx.fillStyle = C.faint; ctx.fillText(lab, bx - 8, y); } // no clipped labels in the phone column
     }
   }
 
@@ -319,7 +320,7 @@ export function drawF3(s, f3, trail, ring, now, opts = {}) {
     ctx.closePath(); ctx.fill();
     ctx.restore();
     if (opts.detail) {
-      ctx.font = `600 10px ${C.ui}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.font = `600 11px ${C.ui}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
       ctx.fillStyle = C.text;
       if (bx + barW + 52 <= w) ctx.fillText(Math.round(f3), bx + barW + 23, y);
       else { ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText(Math.round(f3), w - 6, y - 8); }
@@ -329,7 +330,7 @@ export function drawF3(s, f3, trail, ring, now, opts = {}) {
   // Ring meter
   const ry = h - ringH + 6;
   ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(12, ry - 12, w - 24, 1);
-  ctx.textAlign = 'left'; ctx.fillStyle = C.muted; ctx.font = `600 10px ${C.ui}`;
+  ctx.textAlign = 'left'; ctx.fillStyle = C.muted; ctx.font = `600 11px ${C.ui}`;
   if (!tiny) ctx.fillText(t('RING'), 14, ry + 6);
   const mx = tiny ? 10 : 50, mw = w - mx - (tiny ? 10 : 14);
   roundRect(ctx, mx, ry, mw, 8, 4); ctx.fillStyle = C.track; ctx.fill();
@@ -346,9 +347,10 @@ export function drawF3(s, f3, trail, ring, now, opts = {}) {
   ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(rx(0) - 0.5, ry - 3, 1, 14);
   ctx.fillStyle = C.green; ctx.fillRect(rx(6) - 1, ry - 4, 2, 16);
   if (!tiny) {
-    ctx.font = `500 9px ${C.ui}`; ctx.textBaseline = 'top'; ctx.textAlign = 'center';
-    ctx.fillStyle = C.faint; ctx.fillText(t(opts.detail ? '0 dB speech' : 'speech'), rx(0), ry + 12);
-    ctx.fillStyle = rgba(C.green, 0.8); ctx.fillText(t(opts.detail ? '+6 dB ring' : 'ring'), rx(6), ry + 12);
+    ctx.font = `500 10px ${C.ui}`; ctx.textBaseline = 'top'; ctx.textAlign = 'center';
+    // The two marks are close: "speech" ends at its mark, "ring" starts at its own
+    ctx.textAlign = 'right'; ctx.fillStyle = C.faint; ctx.fillText(t(opts.detail ? '0 dB speech' : 'speech'), rx(0) + 4, ry + 12);
+    ctx.textAlign = 'left'; ctx.fillStyle = rgba(C.green, 0.8); ctx.fillText(t(opts.detail ? '+6 dB ring' : 'ring'), rx(6) - 4, ry + 12);
     if (opts.detail && ring) {
       ctx.textAlign = 'right'; ctx.fillStyle = C.text;
       ctx.fillText(`${ring >= 0 ? '+' : ''}${ring.toFixed(0)} dB`, w - 14, ry + 12);
@@ -383,7 +385,7 @@ export function drawVowelMap(s, vowels, cur, trail, now, opts = {}) {
   ctx.strokeStyle = 'rgba(255,255,255,.035)'; ctx.lineWidth = 1;
   if (D) {
     // Hz grid: F2 labels along the top, F1 labels on the right
-    ctx.font = `500 9px ${C.ui}`; ctx.fillStyle = C.faint; ctx.strokeStyle = 'rgba(255,255,255,.06)';
+    ctx.font = `500 10px ${C.ui}`; ctx.fillStyle = C.faint; ctx.strokeStyle = 'rgba(255,255,255,.06)';
     ctx.textAlign = 'center'; ctx.textBaseline = compact ? 'top' : 'bottom';
     for (const f of [600, 800, 1000, 1500, 2000, 2500, 3000]) {
       const x = xOf(f);
@@ -410,7 +412,7 @@ export function drawVowelMap(s, vowels, cur, trail, now, opts = {}) {
   }
 
   // Axis hints
-  ctx.fillStyle = C.faint; ctx.font = `500 11px ${C.ui}`; ctx.textBaseline = 'middle';
+  ctx.fillStyle = C.faint; ctx.font = `500 12px ${C.ui}`; ctx.textBaseline = 'middle';
   if (!(compact && D)) {
     ctx.textAlign = 'left'; ctx.fillText(t('front'), L - 8, h - B / 2 + 4);
     ctx.textAlign = 'right'; ctx.fillText(t('back'), w - R + 8, h - B / 2 + 4);
@@ -427,7 +429,7 @@ export function drawVowelMap(s, vowels, cur, trail, now, opts = {}) {
   // Harmonic lines: a formant can only show where a harmonic of the sung note falls.
   // F1 is the vertical axis, so harmonics k·f0 are horizontal lines.
   if (opts.f0) {
-    ctx.font = `600 10px ${C.ui}`; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+    ctx.font = `600 11px ${C.ui}`; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
     for (let k = 1; k <= 3; k++) {
       const f = k * opts.f0;
       if (f < F1_LO || f > F1_HI) continue;
@@ -522,7 +524,7 @@ export function drawVowelMap(s, vowels, cur, trail, now, opts = {}) {
     ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x - 17, y); ctx.lineTo(x - 7, y); ctx.moveTo(x + 7, y); ctx.lineTo(x + 17, y);
     ctx.moveTo(x, y - 17); ctx.lineTo(x, y - 7); ctx.moveTo(x, y + 7); ctx.lineTo(x, y + 17); ctx.stroke();
-    ctx.font = `600 10px ${C.ui}`; ctx.fillStyle = C.accent; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.font = `600 11px ${C.ui}`; ctx.fillStyle = C.accent; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
     ctx.fillText(D ? `${t('set')} ${Math.round(opts.target.f1)} / ${Math.round(opts.target.f2)}` : t('set'), x + 14, y - 10);
     ctx.restore();
   }
@@ -543,7 +545,7 @@ export function drawVowelMap(s, vowels, cur, trail, now, opts = {}) {
     ctx.restore();
     if (D) {
       const label = `F1 ${Math.round(cur.f1)} · F2 ${Math.round(cur.f2)}`;
-      ctx.font = `600 11px ${C.ui}`; ctx.textBaseline = 'middle';
+      ctx.font = `600 12px ${C.ui}`; ctx.textBaseline = 'middle';
       const tw = ctx.measureText(label).width;
       const lx = x + 16 + tw > w - 8 ? x - 16 - tw : x + 16;
       ctx.fillStyle = 'rgba(11,13,18,.75)';
@@ -558,102 +560,63 @@ export function drawVowelMap(s, vowels, cur, trail, now, opts = {}) {
 /* ------------------------------------------------------------------ */
 const DB_MIN = -60;
 /**
- * Level bar (current RMS + peak hold) and, when there is room, a scrolling level history.
- * @param {{t:number, db:number, clip?:boolean}[]} hist
+ * Level bar layout shared by the renderer and pointer input (CSS px of the canvas).
+ * Tall canvas (desktop side column): vertical bar, 0 dB at the top. Wide canvas (phone): horizontal, 0 dB at the right.
  */
-export function drawMeter(s, rmsDb, peakHoldDb, opts = {}, hist = [], now = 0) {
+export function meterGeometry(w, h, detail = false) {
+  const vertical = h > w, bw = 14;
+  const frac = (db) => (Math.max(DB_MIN, Math.min(0, db)) - DB_MIN) / -DB_MIN;
+  if (vertical) {
+    const x = detail ? w - 14 - bw : (w - bw) / 2, y0 = 40, y1 = h - 16; // y0: below the panel label
+    return { vertical, bw, x, y0, y1, pos: (db) => y1 - frac(db) * (y1 - y0), dbAt: (_px, py) => DB_MIN + ((y1 - py) / (y1 - y0)) * -DB_MIN };
+  }
+  const x0 = 16, x1 = w - 16, y = detail ? h - 34 : h - 26;
+  return { vertical, bw, x0, x1, y, pos: (db) => x0 + frac(db) * (x1 - x0), dbAt: (px) => DB_MIN + ((px - x0) / (x1 - x0)) * -DB_MIN };
+}
+
+/** Level bar: current RMS in zones (quiet / good / hot) with peak hold; opts.target = synth volume marker. */
+export function drawMeter(s, rmsDb, peakHoldDb, opts = {}) {
   const ctx = s.begin();
   const { w, h } = s;
   const D = !!opts.detail;
-  const x0 = 16, x1 = w - 16, bh = 14;
-  const y = h < 90 ? h / 2 - 9 : 34;
-  const xOf = (db) => x0 + ((Math.max(DB_MIN, Math.min(0, db)) - DB_MIN) / -DB_MIN) * (x1 - x0);
+  const g = meterGeometry(w, h, D), { bw } = g;
+  // Rect of the span a..b along the bar
+  const rect = (a, b, pad = 0) => {
+    const pa = g.pos(a), pb = g.pos(b);
+    return g.vertical ? [g.x - pad, Math.min(pa, pb), bw + 2 * pad, Math.abs(pb - pa)] : [Math.min(pa, pb), g.y - pad, Math.abs(pb - pa), bw + 2 * pad];
+  };
+  roundRect(ctx, ...rect(DB_MIN, 0), bw / 2); ctx.fillStyle = C.track; ctx.fill();
+  ctx.save();
+  roundRect(ctx, ...rect(DB_MIN, 0), bw / 2); ctx.clip();
+  const lvl = Math.max(DB_MIN, Math.min(0, rmsDb));
+  const seg = (a, b, col) => { const top = Math.min(b, lvl); if (top > a) { ctx.fillStyle = col; ctx.fillRect(...rect(a, top)); } };
+  seg(DB_MIN, -45, C.faint);
+  seg(-45, -6, C.green);
+  seg(-6, 0, C.orange);
+  ctx.fillStyle = 'rgba(11,13,18,.55)'; // LED segments
+  for (let db = DB_MIN + 1.5; db < 0; db += 1.5) ctx.fillRect(...(g.vertical ? [g.x, g.pos(db), bw, 1.5] : [g.pos(db), g.y, 1.5, bw]));
+  ctx.restore();
+  ctx.fillStyle = '#fff';
+  if (peakHoldDb > DB_MIN) ctx.fillRect(...(g.vertical ? [g.x - 3, g.pos(peakHoldDb) - 1, bw + 6, 2] : [g.pos(peakHoldDb) - 1, g.y - 3, 2, bw + 6]));
 
-  // ---- bar (Detail only; the history below already shows the level) ----
+  // Synthesize: the set volume, dragged along the bar
+  if (opts.target != null) {
+    const p = g.pos(opts.target);
+    ctx.fillStyle = C.accent;
+    if (g.vertical) { roundRect(ctx, g.x - 5, p - 2, bw + 10, 4, 2); ctx.fill(); }
+    else { roundRect(ctx, p - 2, g.y - 5, 4, bw + 10, 2); ctx.fill(); }
+  }
+
   if (D) {
-    roundRect(ctx, x0, y, x1 - x0, bh, bh / 2); ctx.fillStyle = C.track; ctx.fill();
-    ctx.save();
-    roundRect(ctx, x0, y, x1 - x0, bh, bh / 2); ctx.clip();
-    const lvl = xOf(rmsDb);
-    const seg = (a, b, col) => {
-      const xa = xOf(a), xb = Math.min(xOf(b), lvl);
-      if (xb > xa) { ctx.fillStyle = col; ctx.fillRect(xa, y, xb - xa, bh); }
-    };
-    seg(DB_MIN, -45, C.faint);
-    seg(-45, -6, C.green);
-    seg(-6, 0, C.orange);
-    ctx.fillStyle = 'rgba(11,13,18,.55)';
-    for (let x = x0 + 6; x < x1; x += 6) ctx.fillRect(x, y, 1.5, bh);
-    ctx.restore();
-    if (peakHoldDb > DB_MIN) { ctx.fillStyle = '#fff'; ctx.fillRect(xOf(peakHoldDb) - 1, y - 3, 2, bh + 6); }
-
-    ctx.font = `500 10px ${C.ui}`; ctx.fillStyle = C.faint; ctx.textBaseline = 'top';
-    if (D) {
-      for (const db of [-60, -45, -30, -18, -6, 0]) {
-        ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(xOf(db) - 0.5, y + bh + 2, 1, 4);
-        ctx.fillStyle = C.faint;
-        ctx.textAlign = db === -60 ? 'left' : db === 0 ? 'right' : 'center';
-        ctx.fillText(`${db} dB`, xOf(db), y + bh + 6);
+    ctx.font = `500 11px ${C.ui}`; ctx.fillStyle = C.faint;
+    for (const db of [-60, -45, -30, -18, -6, 0]) {
+      const p = g.pos(db);
+      if (g.vertical) { ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(String(db), g.x - 6, p); }
+      else {
+        ctx.textAlign = db === -60 ? 'left' : db === 0 ? 'right' : 'center'; ctx.textBaseline = 'top';
+        ctx.fillText(db === -60 ? '-60 dB' : String(db), p, g.y + bw + 4);
       }
     }
-  }
-
-  // ---- history ----
-  const hy0 = D ? y + bh + 30 : 30, hy1 = h - 12; // default view: history fills the panel
-  if (hy1 - hy0 < 30) return;
-  const span = 8; // seconds
-  const hx = (t) => sweepX(t, now, span, x0, x1); // sweep, like the pitch trace
-  const hyOf = (db) => hy1 - ((Math.max(DB_MIN, Math.min(0, db)) - DB_MIN) / -DB_MIN) * (hy1 - hy0);
-
-  roundRect(ctx, x0, hy0, x1 - x0, hy1 - hy0, 8);
-  ctx.fillStyle = 'rgba(255,255,255,.015)'; ctx.fill();
-  // zone guides
-  ctx.setLineDash([3, 5]); ctx.lineWidth = 1;
-  ctx.strokeStyle = rgba(C.orange, 0.35);
-  ctx.beginPath(); ctx.moveTo(x0, hyOf(-6)); ctx.lineTo(x1, hyOf(-6)); ctx.stroke();
-  ctx.strokeStyle = 'rgba(255,255,255,.12)';
-  ctx.beginPath(); ctx.moveTo(x0, hyOf(-45)); ctx.lineTo(x1, hyOf(-45)); ctx.stroke();
-  ctx.setLineDash([]);
-  if (D) {
-    ctx.font = `500 10px ${C.ui}`; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-    ctx.fillStyle = rgba(C.orange, 0.7); ctx.fillText('−6 dB', x0 + 6, hyOf(-6) - 2);
-    ctx.fillStyle = C.faint; ctx.fillText('−45 dB', x0 + 6, hyOf(-45) - 2);
-  }
-
-  // Split into runs of increasing x (a run ends where the sweep wrapped or data was erased)
-  const runs = [];
-  let run = [], lastX = -Infinity;
-  for (const p of hist) {
-    const x = hx(p.t);
-    if (x === null) continue;
-    if (x < lastX) { if (run.length) runs.push(run); run = []; }
-    run.push({ x, db: p.db, clip: p.clip });
-    lastX = x;
-  }
-  if (run.length) runs.push(run);
-  sweepHead(ctx, now, span, x0, x1, hy0, hy1);
-  if (runs.length) {
-    ctx.save();
-    roundRect(ctx, x0, hy0, x1 - x0, hy1 - hy0, 8); ctx.clip();
-    const g = ctx.createLinearGradient(0, hy0, 0, hy1);
-    g.addColorStop(0, rgba(C.orange, 0.35));
-    g.addColorStop((hyOf(-6) - hy0) / (hy1 - hy0), rgba(C.green, 0.3));
-    g.addColorStop(1, rgba(C.green, 0.04));
-    for (const r of runs) {
-      if (r.length < 2) continue;
-      ctx.beginPath();
-      ctx.moveTo(r[0].x, hy1);
-      for (const p of r) ctx.lineTo(p.x, hyOf(p.db));
-      ctx.lineTo(r[r.length - 1].x, hy1);
-      ctx.closePath();
-      ctx.fillStyle = g; ctx.fill();
-      ctx.beginPath();
-      r.forEach((p, i) => (i ? ctx.lineTo(p.x, hyOf(p.db)) : ctx.moveTo(p.x, hyOf(p.db))));
-      ctx.strokeStyle = C.green; ctx.lineWidth = 1.5; ctx.stroke();
-      ctx.fillStyle = '#ff4d5e';
-      for (const p of r) if (p.clip) ctx.fillRect(p.x - 1, hy0, 2, hy1 - hy0);
-    }
-    ctx.restore();
   }
 }
 
@@ -670,7 +633,7 @@ export function drawVibrato(s, v, opts = {}) {
   roundRect(ctx, 0.5, 0.5, w - 1, h - 1, 8);
   ctx.fillStyle = 'rgba(11,13,18,.72)'; ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.stroke();
-  ctx.font = `600 10px ${C.ui}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  ctx.font = `600 11px ${C.ui}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
   ctx.fillStyle = C.muted; ctx.fillText(t('VIBRATO'), x0, 12);
 
   // scale: track, typical band, "most appropriate" tick
@@ -678,12 +641,12 @@ export function drawVibrato(s, v, opts = {}) {
   ctx.fillStyle = rgba(C.green, 0.35); ctx.fillRect(xOf(bLo), y - 3, xOf(bHi) - xOf(bLo), 6);
   ctx.fillStyle = rgba(C.green, 0.9); ctx.fillRect(xOf(best) - 0.75, y - 6, 1.5, 12);
   if (opts.detail) {
-    ctx.font = `500 8px ${C.ui}`; ctx.fillStyle = C.faint; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.font = `500 9px ${C.ui}`; ctx.fillStyle = C.faint; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     for (const hz of [4, 5, 6, 7, 8]) ctx.fillText(String(hz), xOf(hz), y + 4);
     ctx.textBaseline = 'middle';
   }
 
-  ctx.textAlign = 'right'; ctx.font = `600 11px ${C.ui}`;
+  ctx.textAlign = 'right'; ctx.font = `600 12px ${C.ui}`;
   if (!v) { ctx.fillStyle = C.faint; ctx.fillText(t('hold a note'), tx, 12); return; }
   if (!v.present) { ctx.fillStyle = C.muted; ctx.fillText(t('straight tone'), tx, 12); return; }
 
@@ -697,7 +660,7 @@ export function drawVibrato(s, v, opts = {}) {
     ? `${v.rate.toFixed(1)} Hz · ±${Math.round(v.extent)}¢`
     : `${rateWord}${extWord ? ' · ' + extWord : ''}`;
   ctx.fillStyle = col; ctx.fillText(txt, tx, 12);
-  if (opts.detail && extWord) { ctx.font = `500 10px ${C.ui}`; ctx.fillStyle = C.orange; ctx.fillText(extWord, tx - ctx.measureText(txt).width - 30, 12); }
+  if (opts.detail && extWord) { ctx.font = `500 11px ${C.ui}`; ctx.fillStyle = C.orange; ctx.fillText(extWord, tx - ctx.measureText(txt).width - 30, 12); }
   // marker
   ctx.save();
   ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = inRate ? 8 : 0;

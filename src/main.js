@@ -6,7 +6,7 @@ import { CalibrationUI, calibratedLandmarks } from './calibration.js';
 import { SynthUI } from './synth.js';
 import { SamplesUI, loadSamples, pickFile } from './sampleplayer.js';
 import { FeedbackRecorder } from './feedback.js';
-import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter, drawVibrato, mapGeometry, f3Geometry } from './ui/panels.js';
+import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter, drawVibrato, mapGeometry, f3Geometry, meterGeometry } from './ui/panels.js';
 import { predictedClusterCurve } from './dsp/ring.js';
 import { t, onLang, setLang, getLang, applyDom } from './i18n.js';
 import { analyzeVibrato, RATE_BAND, RATE_BEST, EXTENT_BAND } from './dsp/vibrato.js';
@@ -84,6 +84,7 @@ function bindToggle(btn, k) {
   sync();
 }
 bindToggle(els.detailToggle, 'detail');
+els.detailToggle.addEventListener('click', () => applyLayout()); // Detail widens the level bar for its dB scale
 bindToggle(els.quarterToggle, 'quarter');
 bindToggle(document.getElementById('pitchAwareToggle'), 'pitchAware');
 
@@ -130,6 +131,7 @@ dragControl(document.getElementById('mapcanvas'), (x, y, w, h) => {
   return { f1: g.f1At(y), f2: g.f2At(x) };
 });
 dragControl(document.getElementById('f3canvas'), (_x, y, w, h) => ({ f3: f3Geometry(w, h, view.detail).fAt(y) }));
+dragControl(document.getElementById('metercanvas'), (x, y, w, h) => ({ db: meterGeometry(w, h, view.detail).dbAt(x, y) }));
 
 let samplesUI = null;
 loadSamples().then((list) => {
@@ -407,15 +409,19 @@ function applyLayout() {
   const H = '38px', grow = 'minmax(0, 1fr)';
   const rows = [], areas = [];
   const add = (r, a) => { rows.push(r); areas.push(a); };
-  add(c('pitch') ? H : mobile ? 'auto' : grow, '"tuner tuner"');
+  // Input level bar: a column on the right on desktop, a strip along the bottom on phones
+  const side = mobile ? '' : ' meter';
+  add(c('pitch') ? H : mobile ? 'auto' : grow, `"tuner tuner${side}"`);
   const mid = mobile ? '400px' : grow;
-  if (c('f3') && c('vowel')) add(H, '"f3 map"');
-  else if (c('f3')) { add(H, '"f3 f3"'); add(mid, '"map map"'); }
-  else if (c('vowel')) { add(H, '"map map"'); add(mid, '"f3 f3"'); }
-  else add(mid, '"f3 map"');
-  add(c('input') ? H : mobile ? '150px' : grow, '"meter meter"');
+  if (c('f3') && c('vowel')) add(H, `"f3 map${side}"`);
+  else if (c('f3')) { add(H, `"f3 f3${side}"`); add(mid, `"map map${side}"`); }
+  else if (c('vowel')) { add(H, `"map map${side}"`); add(mid, `"f3 f3${side}"`); }
+  else add(mid, `"f3 map${side}"`);
+  if (mobile) add(c('input') ? H : view.detail ? '84px' : '64px', '"meter meter"');
+  else if (rows.every((r) => r === H)) rows[rows.length - 1] = grow; // keep the side column tall when all else is hidden
   dash.style.gridTemplateRows = rows.join(' ');
   dash.style.gridTemplateAreas = areas.join(' ');
+  dash.style.gridTemplateColumns = mobile ? '' : `1fr 1fr ${c('input') ? H : view.detail ? '96px' : '76px'}`;
 }
 document.querySelectorAll('#dashboard .panel[data-panel] .collapse-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -431,7 +437,7 @@ applyLayout();
 /* ---------------- analysis + render loop ---------------- */
 const timeBuf = new Float32Array(FFT);
 const specBuf = new Float32Array(FFT / 2);
-let lastClusterPred = predictedClusterCurve(550, 1100), autoHist = [], lastAutoCheck = 0, pitchHist = [], vibHist = [], formantTrail = [], f3Trail = [], levelHist = [], lastPair = null;
+let lastClusterPred = predictedClusterCurve(550, 1100), autoHist = [], lastAutoCheck = 0, pitchHist = [], vibHist = [], formantTrail = [], f3Trail = [], lastPair = null;
 const BASE_SPAN = 5, MAX_SPAN = 13; // semitones visible in the pitch trace (max ≈ an octave + margin)
 const ZOOM_HOLD = 10; // s to keep a zoomed-out view after it was last needed
 let lastVib = null; // last confident vibrato reading (bridges brief dropouts)
@@ -452,7 +458,7 @@ document.getElementById('vibToggle').addEventListener('click', () => {
 });
 applyVibHidden();
 let heldSpan = BASE_SPAN, lastWideT = -100, viewSpan = BASE_SPAN, lastDistortT = -10, lastFrameT = 0, viewCenter = 60, peakHold = -100, peakHoldT = 0, clipT = -10;
-function resetHistory() { pitchHist = []; vibHist = []; formantTrail = []; f3Trail = []; levelHist = []; lastPair = null; }
+function resetHistory() { pitchHist = []; vibHist = []; formantTrail = []; f3Trail = []; lastPair = null; }
 
 function readFrame(now) {
   const { analyser, ctx, demo } = session;
@@ -594,9 +600,7 @@ function render() {
   const clipping = now - clipT < 2; // CLIP appears only when the input actually clipped recently
   els.clip.hidden = !clipping;
   els.clip.classList.toggle('on', clipping);
-  if (o) levelHist.push({ t: now, db: o.rmsDb, clip: o.clipped });
-  prune(levelHist, now, 8.5);
-  drawMeter(surf.meter, rms, peakHold, view, levelHist, now);
+  drawMeter(surf.meter, rms, peakHold, { detail: view.detail, target: synthOn ? synth.state.db : null });
   feedback?.onFrame(o, now);
 }
 requestAnimationFrame(frame);
