@@ -1,6 +1,7 @@
 // Canvas renderers for the four dashboard panels.
 
 import { nearestStep, stepName, stepOctave, midiToFreq } from '../dsp/pitch.js';
+import { t } from '../i18n.js';
 
 export const C = {
   text: '#e8eaf0',
@@ -222,7 +223,7 @@ export function drawF3(s, f3, trail, ring, now, opts = {}) {
   const tiny = w < 90; // compressed mobile column
   const small = (txt, x, y) => {
     ctx.fillStyle = C.muted; ctx.font = `500 ${tiny ? 9 : 11}px ${C.ui}`;
-    ctx.fillText(tiny ? (txt === 'unrounded' ? 'unrnd' : 'rnd') : txt, x, y);
+    ctx.fillText(t(tiny ? (txt === 'unrounded' ? 'unrnd' : 'rnd') : txt), x, y);
   };
   if (wide) {
     const lx = Math.min(w - 50, bx + barW + (opts.detail ? 70 : 100));
@@ -329,7 +330,7 @@ export function drawF3(s, f3, trail, ring, now, opts = {}) {
   const ry = h - ringH + 6;
   ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(12, ry - 12, w - 24, 1);
   ctx.textAlign = 'left'; ctx.fillStyle = C.muted; ctx.font = `600 10px ${C.ui}`;
-  if (!tiny) ctx.fillText('RING', 14, ry + 6);
+  if (!tiny) ctx.fillText(t('RING'), 14, ry + 6);
   const mx = tiny ? 10 : 50, mw = w - mx - (tiny ? 10 : 14);
   roundRect(ctx, mx, ry, mw, 8, 4); ctx.fillStyle = C.track; ctx.fill();
   // Ring = singer's formant level L_SF (Sundberg 1995): 0 dB ≈ ordinary speech-like voice for this vowel,
@@ -346,8 +347,8 @@ export function drawF3(s, f3, trail, ring, now, opts = {}) {
   ctx.fillStyle = C.green; ctx.fillRect(rx(6) - 1, ry - 4, 2, 16);
   if (!tiny) {
     ctx.font = `500 9px ${C.ui}`; ctx.textBaseline = 'top'; ctx.textAlign = 'center';
-    ctx.fillStyle = C.faint; ctx.fillText(opts.detail ? '0 dB speech' : 'speech', rx(0), ry + 12);
-    ctx.fillStyle = rgba(C.green, 0.8); ctx.fillText(opts.detail ? '+6 dB ring' : 'ring', rx(6), ry + 12);
+    ctx.fillStyle = C.faint; ctx.fillText(t(opts.detail ? '0 dB speech' : 'speech'), rx(0), ry + 12);
+    ctx.fillStyle = rgba(C.green, 0.8); ctx.fillText(t(opts.detail ? '+6 dB ring' : 'ring'), rx(6), ry + 12);
     if (opts.detail && ring) {
       ctx.textAlign = 'right'; ctx.fillStyle = C.text;
       ctx.fillText(`${ring >= 0 ? '+' : ''}${ring.toFixed(0)} dB`, w - 14, ry + 12);
@@ -398,7 +399,7 @@ export function drawVowelMap(s, vowels, cur, trail, now, opts = {}) {
     }
     if (w > 520 && !compact) {
       ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillStyle = C.muted;
-      ctx.fillText('Hz · F2 top · F1 right', w - 12, T - 32);
+      ctx.fillText(t('Hz · F2 top · F1 right'), w - 12, T - 32);
     }
   } else {
     for (let i = 1; i < 6; i++) {
@@ -411,12 +412,12 @@ export function drawVowelMap(s, vowels, cur, trail, now, opts = {}) {
   // Axis hints
   ctx.fillStyle = C.faint; ctx.font = `500 11px ${C.ui}`; ctx.textBaseline = 'middle';
   if (!(compact && D)) {
-    ctx.textAlign = 'left'; ctx.fillText('front', L - 8, h - B / 2 + 4);
-    ctx.textAlign = 'right'; ctx.fillText('back', w - R + 8, h - B / 2 + 4);
+    ctx.textAlign = 'left'; ctx.fillText(t('front'), L - 8, h - B / 2 + 4);
+    ctx.textAlign = 'right'; ctx.fillText(t('back'), w - R + 8, h - B / 2 + 4);
   }
   ctx.save(); ctx.translate(L / 2 - 4, 0); ctx.rotate(-Math.PI / 2);
-  ctx.textAlign = 'right'; ctx.fillText('close', -T + 8, 0);
-  ctx.textAlign = 'left'; ctx.fillText('open', -(h - B) - 8, 0);
+  ctx.textAlign = 'right'; ctx.fillText(t('close'), -T + 8, 0);
+  ctx.textAlign = 'left'; ctx.fillText(t('open'), -(h - B) - 8, 0);
   ctx.restore();
 
   const r = Math.max(11, Math.min(30, Math.min(w, h) * 0.06, (h - T - B) * 0.1));
@@ -522,7 +523,7 @@ export function drawVowelMap(s, vowels, cur, trail, now, opts = {}) {
     ctx.beginPath(); ctx.moveTo(x - 17, y); ctx.lineTo(x - 7, y); ctx.moveTo(x + 7, y); ctx.lineTo(x + 17, y);
     ctx.moveTo(x, y - 17); ctx.lineTo(x, y - 7); ctx.moveTo(x, y + 7); ctx.lineTo(x, y + 17); ctx.stroke();
     ctx.font = `600 10px ${C.ui}`; ctx.fillStyle = C.accent; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-    ctx.fillText(D ? `set ${Math.round(opts.target.f1)} / ${Math.round(opts.target.f2)}` : 'set', x + 14, y - 10);
+    ctx.fillText(D ? `${t('set')} ${Math.round(opts.target.f1)} / ${Math.round(opts.target.f2)}` : t('set'), x + 14, y - 10);
     ctx.restore();
   }
 
@@ -670,7 +671,7 @@ export function drawVibrato(s, v, opts = {}) {
   ctx.fillStyle = 'rgba(11,13,18,.72)'; ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.stroke();
   ctx.font = `600 10px ${C.ui}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-  ctx.fillStyle = C.muted; ctx.fillText('VIBRATO', x0, 12);
+  ctx.fillStyle = C.muted; ctx.fillText(t('VIBRATO'), x0, 12);
 
   // scale: track, typical band, "most appropriate" tick
   roundRect(ctx, x0, y - 3, x1 - x0, 6, 3); ctx.fillStyle = C.track; ctx.fill();
@@ -683,12 +684,13 @@ export function drawVibrato(s, v, opts = {}) {
   }
 
   ctx.textAlign = 'right'; ctx.font = `600 11px ${C.ui}`;
-  if (!v) { ctx.fillStyle = C.faint; ctx.fillText('hold a note', tx, 12); return; }
-  if (!v.present) { ctx.fillStyle = C.muted; ctx.fillText('straight tone', tx, 12); return; }
+  if (!v) { ctx.fillStyle = C.faint; ctx.fillText(t('hold a note'), tx, 12); return; }
+  if (!v.present) { ctx.fillStyle = C.muted; ctx.fillText(t('straight tone'), tx, 12); return; }
 
-  const rateWord = v.rate < bLo - 0.5 ? 'slow' : v.rate < bLo ? 'a little slow' : v.rate <= bHi ? 'typical'
+  const rateWord0 = v.rate < bLo - 0.5 ? 'slow' : v.rate < bLo ? 'a little slow' : v.rate <= bHi ? 'typical'
     : v.rate <= bHi + 0.8 ? 'a little fast' : 'fast';
-  const extWord = v.extent < eLo ? 'narrow' : v.extent > eHi ? 'wide' : '';
+  const rateWord = t(rateWord0);
+  const extWord = t(v.extent < eLo ? 'narrow' : v.extent > eHi ? 'wide' : '');
   const inRate = v.rate >= bLo && v.rate <= bHi, nearRate = v.rate >= bLo - 0.5 && v.rate <= bHi + 0.8;
   const col = inRate ? C.green : nearRate ? C.orange : C.muted;
   const txt = opts.detail

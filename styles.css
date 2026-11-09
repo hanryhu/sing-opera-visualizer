@@ -281,6 +281,18 @@ body {
 .sources a { color: var(--accent); }
 .sources .use { display: block; color: var(--faint); font-size: 12px; }
 .help .fineprint { margin-top: 14px !important; }
+.help[open] { display: flex; flex-direction: column; }
+.help-body { flex: 1; min-height: 0; line-height: 1.55; }
+.help-body h3 { font-size: 13px; color: var(--text); text-transform: none; letter-spacing: 0; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+.help-body p { margin: 0 0 8px; }
+.help-body dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0 0 10px; font-size: 14px; }
+.help-body dt { font-weight: 600; color: var(--text); }
+.help-body dd { margin: 0; color: #c9cfdb; }
+.help-body ul { margin: 0 0 10px; padding-left: 20px; font-size: 14px; color: #c9cfdb; display: grid; gap: 4px; }
+@media (max-width: 520px) { .help-body dl { grid-template-columns: 1fr; gap: 0; } .help-body dd { margin-bottom: 8px; } }
+.help-foot { display: flex; justify-content: flex-end; padding: 10px 20px; border-top: 1px solid var(--line); }
+.lang-btn { min-width: 84px; }
+:lang(zh-Hans) { font-family: Inter, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif; }
 
 /* ---------- synthesizer ---------- */
 /* Wide + short so it sits over the pitch trace and never covers the vowel map */

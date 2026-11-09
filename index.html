@@ -139,57 +139,168 @@
 
   <dialog id="helpDialog" class="help" aria-labelledby="helpTitle">
     <div class="help-head">
-      <h2 id="helpTitle">How to read the screen</h2>
+      <h2 id="helpTitle">Guide</h2>
       <button id="helpClose" class="icon-btn" aria-label="Close help">×</button>
     </div>
     <div class="help-body">
-      <h3>Pitch</h3>
-      <p>The big letter is the nearest note. <b class="g">Green</b> = within 10¢, <b class="o">orange</b> = within 30¢,
-        grey = between notes. The colour uses your pitch averaged over ~½ s, so vibrato doesn't flicker it; the trace
-        shows the raw pitch so you can see vibrato width and evenness.</p>
-      <h3>Vibrato</h3>
-      <p>Measured on held notes (about 0.6 s or longer): the <b>rate</b> (wobbles per second) and the
-        <b>extent</b> (how far the pitch swings either side, in cents). The shaded band is the 5.5–6.7 Hz measured on
-        sustained notes of ten celebrated singers (Prame 1994); the tick marks 6 Hz, which listeners rated most
-        appropriate (Anand et al. 2012). Professional extents ranged about ±34 to ±123 cents, averaging ±71
-        (Prame 1997); very wide vibrato was rated less appropriate. Rates naturally speed up near the end of a note.
-        No study we found prescribes vibrato rate by tempo — very short notes simply don't last long enough for a
-        full cycle (≈0.17 s at 6 Hz).</p>
-      <h3>F3 · ring</h3>
-      <p>The pointer is the third formant (F3). Lip rounding lowers it, so it moves toward <i>rounded</i>; the labels
-        show the unrounded/rounded pair for the vowel you're singing (e.g. ʌ / ɔ).</p>
-      <p><b>Ring</b> — also called the <b>singer's formant</b> or <b>squillo</b> (Italian: "clarion, ringing", the bel
-        canto term) — is the bright, carrying quality of a trained voice that cuts through an orchestra. Acoustically it
-        is F3, F4 and F5 pulled together into one strong peak around 2.5–3.2 kHz (Sundberg 1974), where the ear is
-        especially sensitive and the orchestra is relatively quiet; the green zone on the bar marks that region. F3 on its
-        own is not ring — every voice has an F3; ring is the clustering.</p>
-      <p><i>RING</i> measures that singer's formant the way Sundberg (1995) proposed: how much stronger the 3 kHz region
-        is than an ordinary speaking voice would have <i>for the same vowel</i> (every vowel has some energy there —
-        far more in [i] than in [u] — so a plain ratio would mostly report the vowel). <b>0 dB</b> ≈ speech-like;
-        <b>+6 dB</b> or more = a singer's formant. It rises somewhat with loudness and is approximate on high notes.</p>
-      <h3>Vowel · F1 × F2</h3>
-      <p>Laid out like the IPA chart: front vowels left, close vowels top. Circles are the seven Italian vowels for
-        your voice type, or your own after <i>Calibrate</i>. A formant is only audible where a harmonic (a multiple of
-        F0) lands on it. Above ~300 Hz the analyzer fits the harmonic peaks directly; once F0 rises above a vowel's
-        F1 (≈400 Hz for i and u) there is no harmonic below F1 to reveal it, so closed vowels read as more open —
-        the same vowel blending listeners hear on high notes.</p>
-      <h3>Follow pitch</h3>
-      <p>Trained singers move their resonances as they sing higher so a harmonic stays on a resonance: F1 is
-        raised to follow the note once the note passes it, high voices pull F2 up to the 2nd harmonic, and low voices
-        tune F1 to the 2nd harmonic near the top of their range. With <i>Follow pitch</i> on, the circles move this
-        way; faint ghosts mark their low-pitch positions and dotted lines (H1, H2, H3) mark the harmonics. Where
-        vowels merge, every circle the dot is inside lights up — at that pitch the sound can't tell them apart.</p>
-      <h3>Synthesizer</h3>
-      <p>Plays a synthesized vowel with exactly the pitch (F0), formants (F1–F3) and volume you set, and runs it
-        through the analyzer. Use it to hear what a target vowel sounds like, or to check the displays against
-        known values. The vowel buttons load the current landmarks.</p>
-      <h3>Input</h3>
-      <p>Microphone level in dB relative to digital full scale (not SPL). Stay in the green; <i>CLIP</i> means the
-        signal hit maximum and readings will be distorted.</p>
-      <h3>Sources</h3>
+      <div class="help-text" lang="en">
+        <h3>Sources of sound</h3>
+        <dl>
+          <dt>Sing</dt><dd>Analyzes your voice from the microphone.</dd>
+          <dt>Synthesize</dt><dd>Plays a synthetic vowel with the pitch, formants and volume you set, and analyzes it.</dd>
+          <dt>Listen</dt><dd>Plays a short aria excerpt for each voice part and analyzes the vocal line.</dd>
+        </dl>
+        <p>The audio is analyzed on your device and is never uploaded.</p>
+
+        <h3>Pitch</h3>
+        <p>The large letter is the nearest note. Its colour shows how close you are, judged on your pitch averaged over about ½ s, so vibrato does not make it flicker.</p>
+        <dl>
+          <dt><b class="g">Green</b></dt><dd>Within 10 cents of the note: in tune.</dd>
+          <dt><b class="o">Orange</b></dt><dd>Within 30 cents: a little sharp or flat.</dd>
+          <dt>Grey</dt><dd>Between notes.</dd>
+        </dl>
+        <p>The trace below draws your raw pitch from left to right and overwrites itself, like a heart monitor. Use it to see the width and evenness of your vibrato. A cent is 1/100 of a semitone.</p>
+
+        <h3>Vibrato</h3>
+        <p>Shown once a note has been held for about 0.6 s.</p>
+        <dl>
+          <dt>Rate</dt><dd>Pitch cycles per second (Hz). The shaded band, 5.5–6.7 Hz, is the range measured in ten celebrated opera singers (Prame 1994). The tick at 6 Hz is the rate listeners judged most appropriate (Anand et al. 2012).</dd>
+          <dt>Extent</dt><dd>How far the pitch swings on each side, in cents. Professional singers measured about ±34 to ±123 cents, averaging ±71 (Prame 1997). Very wide vibrato was judged less appropriate.</dd>
+        </dl>
+        <p>Vibrato naturally speeds up near the end of a note. Very short notes are not long enough for a full cycle (about 0.17 s at 6 Hz).</p>
+
+        <h3>Formants</h3>
+        <p>A <b>formant</b> is a resonance of the vocal tract (the throat, mouth and lips). The shape of the tract sets the formants, and the formants make the vowel. They are numbered from the lowest:</p>
+        <dl>
+          <dt>F0</dt><dd>Not a formant: the fundamental frequency, the pitch you sing.</dd>
+          <dt>F1</dt><dd>Rises as the jaw opens: low for [i] and [u], high for [a].</dd>
+          <dt>F2</dt><dd>Rises as the tongue moves forward: high for [i], low for [u].</dd>
+          <dt>F3</dt><dd>Falls as the lips round.</dd>
+        </dl>
+        <p>A formant is heard only where a harmonic of the voice (a whole-number multiple of F0) falls on it.</p>
+
+        <h3>F3 · ring</h3>
+        <p>The pointer on the bar is F3. Rounding the lips moves it toward <i>rounded</i>. The two symbols are the unrounded and rounded forms of the vowel you are singing (for example ʌ and ɔ).</p>
+        <p><b>Ring</b>, also called the <b>singer's formant</b> or <b>squillo</b> (Italian for "ringing, clarion"), is the bright, carrying quality that lets a trained voice be heard over an orchestra. It forms when F3, F4 and F5 cluster into one strong peak near 2.5–3.2 kHz (Sundberg 1974). The ear is especially sensitive there, and the orchestra is relatively quiet. The green zone on the bar marks this region. Every voice has an F3; ring is the clustering, not F3 itself.</p>
+        <p>The <b>RING</b> meter compares the level near 3 kHz with what an ordinary speaking voice would produce on the same vowel (Sundberg 1995). It compares like with like because every vowel puts some energy there, far more in [i] than in [u].</p>
+        <dl>
+          <dt>0 dB</dt><dd>Speech-like.</dd>
+          <dt>+6 dB or more</dt><dd>A singer's formant is present.</dd>
+        </dl>
+        <p>The reading rises somewhat with loudness and is approximate on high notes. In Detail view the bar shows the spectrum from 2 to 4 kHz on its side. The filled shape is your voice; the dotted line is the speech-like reference.</p>
+
+        <h3>Vowel · F1 × F2</h3>
+        <p>The map is laid out like the IPA vowel chart: front vowels on the left, close vowels at the top. The dot is your vowel. The circles are the seven Italian vowels for your voice range, or your own vowels after calibration.</p>
+        <p><b>High notes.</b> Above about 300 Hz the analyzer fits the harmonic peaks directly. Once F0 rises above a vowel's F1 (about 400 Hz for [i] and [u]), no harmonic lies below F1 to reveal it. Close vowels then read as more open. Listeners hear the same blending of vowels on high notes.</p>
+
+        <h3>Follow pitch</h3>
+        <p>Trained singers adjust their resonances as they go higher so that a harmonic stays on a resonance:</p>
+        <ul>
+          <li>F1 rises to follow the note once the note reaches it.</li>
+          <li>High voices raise F2 to the second harmonic.</li>
+          <li>Low voices tune F1 to the second harmonic near the top of the range.</li>
+        </ul>
+        <p>With <i>Follow pitch</i> on, the circles move in the same way. Faint circles mark their positions at low pitch. Dotted lines (H1, H2, H3) mark the harmonics. Where vowels merge, every circle that contains the dot lights up; at that pitch the sound cannot tell them apart.</p>
+
+        <h3>Input</h3>
+        <p>Shows the microphone level in dB relative to digital full scale, not sound pressure. Keep it in the green. <i>CLIP</i> means the signal reached its maximum; the sound is distorted and the readings are paused. Lower the microphone level or step back.</p>
+
+        <h3>Controls</h3>
+        <dl>
+          <dt>Detail</dt><dd>Adds Hz values, grids, the ring spectrum and extra vowels.</dd>
+          <dt>Record</dt><dd>Saves up to 30 s of the screen and sound as a video.</dd>
+          <dt>Voice range</dt><dd><i>Auto</i> detects your range from the pitches you sing. <i>High</i> is soprano to countertenor; <i>Low</i> is tenor to bass.</dd>
+          <dt>Quarter tones</dt><dd>Names pitches halfway between semitones.</dd>
+          <dt>Calibrate vowels</dt><dd>Records your own vowels to replace the default circles.</dd>
+          <dt>Hide panel</dt><dd>The arrow beside a panel's name folds it away.</dd>
+        </dl>
+
+        <h3>Synthesizer</h3>
+        <p>Set the pitch (F0), F1–F3 and volume with the sliders, or drag the dot on the vowel map and the pointer on the F3 bar. The vowel buttons load the current vowel positions. Use it to hear a target vowel, or to check the displays against known values.</p>
+      </div>
+
+      <div class="help-text" lang="zh-Hans" hidden>
+        <h3>声音来源</h3>
+        <dl>
+          <dt>演唱</dt><dd>通过麦克风分析你的声音。</dd>
+          <dt>合成</dt><dd>按你设定的音高、共振峰和音量播放合成元音，并进行分析。</dd>
+          <dt>聆听</dt><dd>为每个声部播放一段咏叹调片段，并分析其中的人声。</dd>
+        </dl>
+        <p>音频只在你的设备上分析，不会上传。</p>
+
+        <h3>音高</h3>
+        <p>大字母是最接近的音名。颜色表示你的音准，依据约 ½ 秒内的平均音高判断，因此颤音不会使它闪烁。</p>
+        <dl>
+          <dt><b class="g">绿色</b></dt><dd>与该音相差 10 音分以内：音准。</dd>
+          <dt><b class="o">橙色</b></dt><dd>相差 30 音分以内：略高或略低。</dd>
+          <dt>灰色</dt><dd>介于两个音之间。</dd>
+        </dl>
+        <p>下方的曲线从左向右绘制你的实时音高，并像心电图一样循环覆盖。可用它观察颤音的幅度与均匀程度。1 音分为半音的 1/100。</p>
+
+        <h3>颤音</h3>
+        <p>持续一个音约 0.6 秒后显示。</p>
+        <dl>
+          <dt>速率</dt><dd>每秒音高起伏的次数（Hz）。阴影带 5.5–6.7 Hz 是在十位著名歌剧演唱家身上测得的范围（Prame 1994）。6 Hz 处的刻度是听众认为最合适的速率（Anand 等 2012）。</dd>
+          <dt>幅度</dt><dd>音高向上、向下各偏离多少，以音分计。职业歌手约为 ±34 至 ±123 音分，平均 ±71（Prame 1997）。过宽的颤音被认为不太合适。</dd>
+        </dl>
+        <p>颤音在音的结尾处会自然加快。很短的音不足以完成一个完整周期（6 Hz 时约 0.17 秒）。</p>
+
+        <h3>共振峰</h3>
+        <p><b>共振峰</b>是声道（咽喉、口腔与双唇）的共振。声道的形状决定共振峰，共振峰决定元音。按频率从低到高编号：</p>
+        <dl>
+          <dt>F0</dt><dd>不是共振峰，而是基频，即你唱的音高。</dd>
+          <dt>F1</dt><dd>下颌张开时升高：[i]、[u] 低，[a] 高。</dd>
+          <dt>F2</dt><dd>舌位前移时升高：[i] 高，[u] 低。</dd>
+          <dt>F3</dt><dd>双唇收圆时降低。</dd>
+        </dl>
+        <p>只有当声音的某个谐波（F0 的整数倍）落在共振峰上时，这个共振峰才能被听到。</p>
+
+        <h3>F3 · 共鸣</h3>
+        <p>竖条上的指针是 F3。双唇收圆会使它移向<i>圆唇</i>。两个符号分别是你所唱元音的非圆唇形式和圆唇形式（例如 ʌ 与 ɔ）。</p>
+        <p><b>共鸣</b>（ring），又称<b>歌手共振峰</b>或 <b>squillo</b>（意大利语，意为"嘹亮、号角般"），是训练有素的嗓音明亮、穿透力强、能越过乐队被听见的特质。它的成因是 F3、F4、F5 聚集成 2.5–3.2 kHz 附近的一个强峰（Sundberg 1974）。人耳在这一频段格外敏感，而乐队在这里相对较弱。竖条上的绿色区域标出这一频段。每个人的声音都有 F3；共鸣指的是共振峰的聚集，而不是 F3 本身。</p>
+        <p><b>共鸣</b>表比较 3 kHz 附近的能量与普通说话声在同一元音上的能量（Sundberg 1995）。之所以按同一元音比较，是因为每个元音在这里都有一些能量，[i] 远多于 [u]。</p>
+        <dl>
+          <dt>0 dB</dt><dd>接近说话声。</dd>
+          <dt>+6 dB 及以上</dt><dd>具有歌手共振峰。</dd>
+        </dl>
+        <p>声音越响，读数会略有升高；高音时读数只是近似值。在详细视图中，竖条横向显示 2–4 kHz 的频谱：填充形状是你的声音，虚线是说话声的参考。</p>
+
+        <h3>元音 · F1 × F2</h3>
+        <p>此图的布局与国际音标元音图相同：前元音在左，闭元音在上。圆点是你的元音。圆圈是你所选音域的七个意大利语元音；校准后则显示你自己的元音。</p>
+        <p><b>高音。</b>基频高于约 300 Hz 时，分析器直接拟合谐波峰。当 F0 超过某个元音的 F1（[i] 和 [u] 约为 400 Hz）时，F1 以下已没有谐波可以显示它，闭元音就会显得更开。听众在高音上听到的元音趋同也是同样的原因。</p>
+
+        <h3>跟随音高</h3>
+        <p>训练有素的歌手在唱高时会调整共振，使某个谐波始终落在共振上：</p>
+        <ul>
+          <li>当音高达到 F1 时，F1 随音高一起上升。</li>
+          <li>高音声部把 F2 提高到第二谐波。</li>
+          <li>低音声部在音域顶端把 F1 调到第二谐波。</li>
+        </ul>
+        <p>开启<i>跟随音高</i>后，圆圈会以同样方式移动。淡色圆圈标出它们在低音时的位置，虚线（H1、H2、H3）标出各谐波。元音重合时，包含圆点的每个圆圈都会亮起；在这个音高上，声音本身无法区分它们。</p>
+
+        <h3>输入</h3>
+        <p>显示麦克风电平，单位是相对于数字满刻度的 dB，而不是声压级。请保持在绿色区域。<i>CLIP</i> 表示信号达到最大值：声音失真，读数暂停。请调低麦克风电平或离远一些。</p>
+
+        <h3>控制</h3>
+        <dl>
+          <dt>详细</dt><dd>增加 Hz 数值、网格、共鸣频谱和更多元音。</dd>
+          <dt>录制</dt><dd>将最多 30 秒的画面和声音保存为视频。</dd>
+          <dt>音域</dt><dd><i>自动</i>根据你唱的音高判断音域。<i>高</i>为女高音至假声男高音；<i>低</i>为男高音至男低音。</dd>
+          <dt>四分音</dt><dd>标出两个半音正中间的音高。</dd>
+          <dt>校准元音</dt><dd>录下你自己的元音，替换默认圆圈。</dd>
+          <dt>隐藏面板</dt><dd>面板名称旁的箭头可将其折叠。</dd>
+        </dl>
+
+        <h3>合成器</h3>
+        <p>用滑块设置音高（F0）、F1–F3 和音量，或拖动元音图上的圆点和 F3 竖条上的指针。元音按钮载入当前的元音位置。可用来听目标元音，或用已知数值检验显示是否正确。</p>
+      </div>
+
+      <h3 class="help-sources-title">Sources</h3>
       <ol id="helpSources" class="sources"></ol>
-      <p class="fineprint">Default landmarks are population averages from speech, not singing; calibrate for the
-        most accurate map.</p>
+      <p class="fineprint">The default vowel positions are averages from speech, not singing. Calibrate for the most accurate map.</p>
+    </div>
+    <div class="help-foot">
+      <button id="langBtn" class="btn btn-ghost lang-btn" type="button" lang="zh-Hans">中文</button>
     </div>
   </dialog>
 

@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 // Synthesizer panel: user-set F0 / F1 / F2 / F3 / volume driving the formant-synth worklet.
 
 import { NOTE_NAMES, midiToFreq } from './dsp/pitch.js';
@@ -139,7 +140,7 @@ export class SynthUI {
     this.out.f1.textContent = `${s.f1} Hz`;
     this.out.f2.textContent = `${s.f2} Hz`;
     this.out.f3.textContent = `${s.f3} Hz`;
-    this.out.db.textContent = s.db <= -40 ? 'muted' : `${s.db} dB`;
+    this.out.db.textContent = s.db <= -40 ? t('muted') : `${s.db} dB`;
     for (const [k, input] of Object.entries(this.inline)) if (input && document.activeElement !== input) input.value = String(s[k]);
     if (this.inlineOut.midi) this.inlineOut.midi.textContent = this.out.midi.textContent;
     if (this.inlineOut.db) this.inlineOut.db.textContent = this.out.db.textContent;
@@ -152,7 +153,7 @@ export class SynthUI {
 
   renderPlay() {
     const running = this.h.isRunning();
-    this.el.play.textContent = running ? 'Stop sound' : 'Play';
+    this.el.play.textContent = t(running ? 'Stop sound' : 'Play');
     this.el.play.className = running ? 'btn btn-secondary' : 'btn btn-primary';
   }
 }

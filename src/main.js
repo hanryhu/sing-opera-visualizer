@@ -8,6 +8,7 @@ import { SamplesUI, loadSamples, pickFile } from './sampleplayer.js';
 import { FeedbackRecorder } from './feedback.js';
 import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter, drawVibrato, mapGeometry, f3Geometry } from './ui/panels.js';
 import { predictedClusterCurve } from './dsp/ring.js';
+import { t, onLang, setLang, getLang, applyDom } from './i18n.js';
 import { analyzeVibrato, RATE_BAND, RATE_BEST, EXTENT_BAND } from './dsp/vibrato.js';
 
 const FFT = 4096;
@@ -64,8 +65,8 @@ function updateVoiceUI() {
   document.querySelectorAll('button[data-voicemode]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.voicemode === voiceMode)));
   if (els.voiceDetected) {
     els.voiceDetected.textContent = voiceMode === 'auto'
-      ? `Using ${voice === 'high' ? 'High' : 'Low'} voice${autoNote ? ` — your typical pitch ${autoNote}` : ' — sing to detect'}`
-      : VOICE_PRESETS[voice].hint;
+      ? `${t(voice === 'high' ? 'Using High voice' : 'Using Low voice')} — ${autoNote ? `${t('your typical pitch')} ${autoNote}` : t('sing to detect')}`
+      : t(VOICE_PRESETS[voice].hint);
   }
 }
 document.querySelectorAll('button[data-voicemode]').forEach((b) =>
@@ -97,7 +98,7 @@ function refreshLandmarks() {
 let calib = null;
 calib = new CalibrationUI({
   getVoice: () => voice,
-  voiceLabel: (v) => VOICE_PRESETS[v].label,
+  voiceLabel: (v) => t(VOICE_PRESETS[v].label),
   ensureSession: async () => { if (!session) await start('mic'); return !!session; }, // calibration sings into the mic
   onSaved: refreshLandmarks,
 });
@@ -293,9 +294,9 @@ function stop() { // never returns to the landing page
 
 function showError(err) {
   const name = err?.name || '';
-  let msg = 'Could not start audio: ' + (err?.message || name || 'unknown error');
+  let msg = (getLang() === 'zh' ? '无法启动音频：' : 'Could not start audio: ') + (err?.message || name || 'unknown error');
   if (name === 'NotAllowedError' || name === 'SecurityError') {
-    msg = 'Microphone permission was blocked. Allow microphone access for this site (click the lock/site icon in the address bar), then try again.';
+    msg = getLang() === 'zh' ? '麦克风权限被阻止。请在地址栏的锁形图标中允许本网站使用麦克风，然后重试。' : 'Microphone permission was blocked. Allow microphone access for this site (click the lock/site icon in the address bar), then try again.';
   } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
     msg = 'No microphone was found. Plug one in or check your system sound settings, then try again.';
   } else if (name === 'NotReadableError') {
@@ -303,6 +304,7 @@ function showError(err) {
   } else if (name === 'InsecureContext') {
     msg = 'Microphone access needs a secure page (https:// or http://localhost).';
   }
+  msg = t(msg);
   if (!els.landing.hidden) { els.error.textContent = msg; els.error.hidden = false; return; }
   els.toast.textContent = msg;
   els.toast.hidden = false;
@@ -398,7 +400,7 @@ function applyLayout() {
     p.classList.toggle('collapsed', on);
     const btn = p.querySelector('.collapse-btn');
     btn.setAttribute('aria-expanded', String(!on));
-    btn.title = on ? 'Show panel' : 'Hide panel';
+    btn.title = t(on ? 'Show panel' : 'Hide panel');
     btn.setAttribute('aria-label', btn.title);
   });
   const mobile = matchMedia('(max-width: 760px)').matches;
@@ -438,8 +440,8 @@ let vibHidden = store.get('va.vibHidden', '0') === '1';
 function applyVibHidden() {
   const wrap = document.getElementById('vibWrap'), btn = document.getElementById('vibToggle');
   wrap.classList.toggle('off', vibHidden);
-  btn.textContent = vibHidden ? 'VIBRATO' : '×';
-  btn.title = vibHidden ? 'Show vibrato' : 'Hide vibrato';
+  btn.textContent = vibHidden ? t('VIBRATO') : '×';
+  btn.title = t(vibHidden ? 'Show vibrato' : 'Hide vibrato');
   btn.setAttribute('aria-label', btn.title);
   btn.setAttribute('aria-pressed', String(!vibHidden));
 }
@@ -493,9 +495,9 @@ function render() {
     els.noteName.textContent = stepName(nearest);
     els.noteOct.textContent = stepOctave(nearest);
     els.noteBox.className = 'note ' + state;
-    els.tuneState.textContent = state === 'in' ? 'in tune'
+    els.tuneState.textContent = t(state === 'in' ? 'in tune'
       : state === 'near' ? (cents > 0 ? 'a little sharp' : 'a little flat')
-      : 'between notes';
+      : 'between notes');
     // Auto-zoom, tuned for comfort: zoom OUT promptly when the pitch has spread over a wide range in the last
     // 3 s; HOLD that zoom until it hasn't been needed for ZOOM_HOLD s (even after those notes scroll off);
     // zoom back IN slowly. While zoomed out the view doesn't pan unless the pitch nears an edge.
@@ -525,7 +527,7 @@ function render() {
     els.noteName.textContent = '–';
     els.noteOct.textContent = '';
     els.noteBox.className = 'note';
-    els.tuneState.textContent = !session ? '' : session.mode === 'mic' ? 'sing a note' : 'waiting for a voice';
+    els.tuneState.textContent = t(!session ? '' : session.mode === 'mic' ? 'sing a note' : 'waiting for a voice');
   }
   lastFrameT = now;
   if (o?.voiced) pitchHist.push({ t: now, midi: o.midiRaw, mean: o.midiMean, state });
@@ -568,9 +570,9 @@ function render() {
   const tooLoud = now - lastDistortT < 0.6;
   const highPitch = !!(o?.f0 && o.f0 > 400); // F0 above close-vowel F1: i/u read as more open
   const uncertain = tooLoud || highPitch;
-  els.mapHint.textContent = tooLoud
+  els.mapHint.textContent = t(tooLoud
     ? 'Too loud — input is clipping, vowel reading paused. Lower mic level or step back.'
-    : 'High pitch: closed vowels (i, u, e, o) read as more open';
+    : 'High pitch: closed vowels (i, u, e, o) read as more open');
   els.mapHint.hidden = !(cur && uncertain);
   const synthOn = session?.mode === 'synth';
   drawVowelMap(surf.map, shown, cur, formantTrail, now, {
@@ -621,5 +623,17 @@ loadSamples().then((list) => {
     `<span class="use">Sample (${esc(smp.part)}) · ${esc(smp.license)} · ${esc(smp.excerpt || 'excerpt')}</span></li>`).join(''));
 });
 document.getElementById('helpBtn').addEventListener('click', () => help.showModal());
+// Language: 中文 / English button in the Help footer. Static text is translated by applyDom; these re-render the rest.
+document.getElementById('langBtn').addEventListener('click', () => setLang(getLang() === 'zh' ? 'en' : 'zh'));
+onLang(() => {
+  updateVoiceUI();
+  applyLayout();
+  applyVibHidden();
+  synth.render?.();
+  if (!document.getElementById('calPanel').hidden) calib.render();
+  samplesUI?.render();
+});
+applyDom();
+if (getLang() !== 'en') for (const fn of [updateVoiceUI, applyLayout, applyVibHidden]) fn();
 document.getElementById('helpClose').addEventListener('click', () => help.close());
 help.addEventListener('click', (e) => { if (e.target === help) help.close(); });

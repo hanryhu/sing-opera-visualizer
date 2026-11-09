@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 // Samples panel: play an openly licensed aria excerpt per voice part through the analyzer.
 
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -51,11 +52,11 @@ export class SamplesUI {
     const playing = this.h.playingId();
     this.el.list.innerHTML = this.samples.length ? this.samples.map((s) => `
       <li class="sample${playing === s.id ? ' on' : ''}">
-        <button class="sample-play" data-id="${esc(s.id)}" aria-label="${playing === s.id ? 'Stop' : 'Play'} ${esc(s.part)}">${playing === s.id ? '■' : '▶'}</button>
+        <button class="sample-play" data-id="${esc(s.id)}" aria-label="${t(playing === s.id ? 'Stop' : 'Play')} ${esc(t(s.part))}">${playing === s.id ? '■' : '▶'}</button>
         <div class="sample-text">
-          <div><b>${esc(s.part)}</b> · <i>${esc(s.aria)}</i></div>
+          <div><b>${esc(t(s.part))}</b> · <i>${esc(s.aria)}</i></div>
           <div class="sample-meta">${esc(s.singer)}${s.year ? `, ${esc(s.year)}` : ''} · ${esc(s.composer)}, ${esc(s.opera)}</div>
         </div>
-      </li>`).join('') : '<li class="sample-meta">Samples are not available.</li>';
+      </li>`).join('') : `<li class="sample-meta">${t('Samples are not available.')}</li>`;
   }
 }

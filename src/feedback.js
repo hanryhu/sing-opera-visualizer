@@ -1,3 +1,4 @@
+import { t, isZh } from './i18n.js';
 // Record: up to MAX_SECONDS of the dashboard as a video with sound, settings burned into a header line.
 // The app draws the frames itself (no screen-share prompt, works on phones); the audio track is exactly
 // what the analyzer hears (shared tap node). One file, saved locally.
@@ -42,10 +43,10 @@ export class FeedbackRecorder {
 
   start() {
     const session = this.h.getSession();
-    if (!session) { this.h.toast('Start Sing, Synthesize or Listen first, then press Record.'); return; }
+    if (!session) { this.h.toast(t('Start Sing, Synthesize or Listen first, then press Record.')); return; }
     const mime = pickMime();
     const canvas = document.createElement('canvas');
-    if (!mime || !canvas.captureStream) { this.h.toast('Recording is not supported in this browser.'); return; }
+    if (!mime || !canvas.captureStream) { this.h.toast(t('Recording is not supported in this browser.')); return; }
     const { ctx, tap } = session;
     const dash = document.getElementById('dashboard').getBoundingClientRect();
     const scale = OUT_W / dash.width;
@@ -145,7 +146,7 @@ export class FeedbackRecorder {
       rec.mr.stop();
     });
     if (!blob.size) {
-      this.h.toast('The recording came out empty — keep this tab in front while recording.');
+      this.h.toast(t('The recording came out empty — keep this tab in front while recording.'));
       return;
     }
     const name = `sing-record-${stamp(rec.t0)}.${rec.mime.includes('mp4') ? 'mp4' : 'webm'}`;
@@ -153,7 +154,7 @@ export class FeedbackRecorder {
     const a = document.createElement('a');
     a.href = url; a.download = name;
     document.body.appendChild(a); a.click(); a.remove(); // save straight away
-    this.el.summary.textContent = `Saved ${seconds.toFixed(1)} s to your Downloads folder. If it didn't download, use the link below.`;
+    this.el.summary.textContent = isZh() ? `已将 ${seconds.toFixed(1)} 秒保存到下载文件夹。如果没有下载，请使用下方链接。` : `Saved ${seconds.toFixed(1)} s to your Downloads folder. If it didn't download, use the link below.`;
     this.el.links.innerHTML = `<li><a href="${url}" download="${name}">${name}</a> <span class="sample-meta">${(blob.size / 1024).toFixed(0)} KB</span></li>`;
     this.el.panel.hidden = false;
   }

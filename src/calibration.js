@@ -1,6 +1,7 @@
 // Vowel calibration: capture the singer's own F1/F2/F3 per vowel, persist per voice preset.
 
 import { CALIBRATION_ORDER, REQUIRED, landmarksFromCalibration } from './vowels.js';
+import { t, isZh, exampleFor } from './i18n.js';
 
 const CAPTURE_SECONDS = 3;
 const SKIP_SECONDS = 0.5; // ignore the onset
@@ -76,11 +77,11 @@ export class CalibrationUI {
     this.el.voice.textContent = this.h.voiceLabel(this.h.getVoice());
     this.el.chips.innerHTML = CALIBRATION_ORDER.map((ipa) => {
       const cls = ['cal-chip', this.draft[ipa] ? 'done' : '', REQUIRED.includes(ipa) ? '' : 'optional'].join(' ');
-      return `<button role="tab" class="${cls}" data-ipa="${ipa}" aria-selected="${ipa === v}" title="${EXAMPLES[ipa]}">${ipa}</button>`;
+      return `<button role="tab" class="${cls}" data-ipa="${ipa}" aria-selected="${ipa === v}" title="${exampleFor(ipa, EXAMPLES[ipa])}">${ipa}</button>`;
     }).join('');
     this.el.vowel.textContent = v;
-    this.el.example.textContent = EXAMPLES[v];
-    this.el.record.textContent = this.rec ? 'Listening…' : this.draft[v] ? 'Record again' : 'Record';
+    this.el.example.textContent = exampleFor(v, EXAMPLES[v]);
+    this.el.record.textContent = t(this.rec ? 'Listening…' : this.draft[v] ? 'Record again' : 'Record');
     this.el.record.disabled = !!this.rec;
     this.el.save.disabled = !REQUIRED.every((x) => this.draft[x]);
   }
@@ -92,9 +93,9 @@ export class CalibrationUI {
 
   async record() {
     if (this.rec) return;
-    if (!(await this.h.ensureSession())) { this.setMsg('Start the microphone first.', true); return; }
+    if (!(await this.h.ensureSession())) { this.setMsg(t('Start the microphone first.'), true); return; }
     this.rec = { vowel: this.selected, t0: performance.now() / 1000, frames: [] };
-    this.setMsg(`Sing “${this.selected}” now…`);
+    this.setMsg(isZh() ? `现在唱 “${this.selected}”…` : `Sing “${this.selected}” now…`);
     this.render();
   }
 
@@ -110,7 +111,7 @@ export class CalibrationUI {
     this.rec = null;
     this.el.bar.style.width = '0%';
     if (r.frames.length < MIN_FRAMES) {
-      this.setMsg('Not enough steady voice — sing a little louder and hold the vowel.', true);
+      this.setMsg(t('Not enough steady voice — sing a little louder and hold the vowel.'), true);
     } else {
       const res = {
         f1: Math.round(median(r.frames.map((f) => f.f1))),
@@ -119,8 +120,10 @@ export class CalibrationUI {
       };
       this.draft[r.vowel] = res;
       const next = CALIBRATION_ORDER.find((v) => !this.draft[v]);
-      this.setMsg(`✓ ${r.vowel} captured (F1 ${res.f1} · F2 ${res.f2} Hz)` +
-        (REQUIRED.every((x) => this.draft[x]) ? ' — ready to save.' : ''));
+      const ready = REQUIRED.every((x) => this.draft[x]);
+      this.setMsg(isZh()
+        ? `✓ 已录下 ${r.vowel}（F1 ${res.f1} · F2 ${res.f2} Hz）${ready ? '，可以保存。' : ''}`
+        : `✓ ${r.vowel} captured (F1 ${res.f1} · F2 ${res.f2} Hz)${ready ? ' — ready to save.' : ''}`);
       if (next) this.selected = next;
     }
     this.render();
@@ -128,7 +131,7 @@ export class CalibrationUI {
 
   save() {
     try { localStorage.setItem(key(this.h.getVoice()), JSON.stringify(this.draft)); } catch { /* ignore */ }
-    this.setMsg('Saved. The vowel map now uses your vowels.');
+    this.setMsg(t('Saved. The vowel map now uses your vowels.'));
     this.h.onSaved();
   }
 
@@ -136,7 +139,7 @@ export class CalibrationUI {
     try { localStorage.removeItem(key(this.h.getVoice())); } catch { /* ignore */ }
     this.draft = {};
     this.selected = 'a';
-    this.setMsg('Back to the default vowel landmarks.');
+    this.setMsg(t('Back to the default vowel landmarks.'));
     this.render();
     this.h.onSaved();
   }
