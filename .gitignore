@@ -2,3 +2,5 @@ __pycache__/
 .vercel/
 .DS_Store
 .qa/
+tools/praat-bench/*.wav
+tools/praat-bench/*.json

@@ -1,0 +1,32 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>app analyzer batch</title>
+<pre id="log">running…</pre>
+<script type="module">
+// Runs the app's Analyzer offline (no audio output) on every benchmark WAV, 10 ms hop, 4096-sample frames
+// (the live app's buffer), and saves results via the local receiver on :5175.
+import { Analyzer } from '../../src/dsp/analyzer.js';
+const log = (s) => (document.getElementById('log').textContent += '\n' + s);
+const truth = await (await fetch('truth.json')).json();
+const names = [...Object.keys(truth), ...['bass', 'baritone', 'tenor', 'mezzo', 'soprano'].map((v) => 'real_' + v)];
+const FS = 48000, N = 4096, HOP = 480;
+const ctx = new OfflineAudioContext(1, 1, FS);
+const out = {};
+for (const name of names) {
+  const buf = await ctx.decodeAudioData(await (await fetch(name + '.wav')).arrayBuffer());
+  const x = buf.getChannelData(0);
+  const an = new Analyzer(FS);
+  const r = { t: [], f0: [], f1: [], f2: [], f3: [] };
+  for (let e = N; e <= x.length; e += HOP) {
+    const t = e / FS;
+    const o = an.process(x.subarray(e - N, e), null, t);
+    r.t.push(+t.toFixed(3));
+    r.f0.push(o.voiced ? +o.f0.toFixed(2) : 0);
+    r.f1.push(Math.round(o.f1)); r.f2.push(Math.round(o.f2)); r.f3.push(Math.round(o.f3));
+  }
+  out[name] = r;
+}
+await fetch('http://127.0.0.1:5175/app.json', { method: 'POST', body: JSON.stringify(out) });
+log('done ' + names.length);
+window.__done = true;
+</script>
