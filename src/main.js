@@ -127,7 +127,7 @@ dragControl(document.getElementById('mapcanvas'), (x, y, w, h) => {
   const g = mapGeometry(w, h, view.detail);
   return { f1: g.f1At(y), f2: g.f2At(x) };
 });
-dragControl(document.getElementById('f3canvas'), (_x, y, w, h) => ({ f3: f3Geometry(w, h).fAt(y) }));
+dragControl(document.getElementById('f3canvas'), (_x, y, w, h) => ({ f3: f3Geometry(w, h, view.detail).fAt(y) }));
 
 let samplesUI = null;
 loadSamples().then((list) => {

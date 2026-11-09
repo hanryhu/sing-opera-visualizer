@@ -193,10 +193,11 @@ export function drawTrace(s, hist, now, centerMidi, opts = {}) {
 /* ------------------------------------------------------------------ */
 const F3_LO = 1800, F3_HI = 4000;
 /** F3 bar layout shared by the renderer and pointer input (CSS px of the canvas). */
-export function f3Geometry(w, h) {
+export function f3Geometry(w, h, detail = false) {
   const ringH = 46;
   const wide = w >= 220;
-  const barW = wide ? Math.min(110, w * 0.28) : Math.min(40, w * 0.45);
+  // Detail: wide bar holding the sideways spectrum; default: slim bar with the F3 line only
+  const barW = detail ? (wide ? Math.min(110, w * 0.28) : Math.min(40, w * 0.45)) : Math.min(40, w * 0.3);
   const bx = wide ? Math.round(w * 0.36 - barW / 2) : (w - barW) / 2;
   const barTop = wide ? 40 : 86, barBot = h - (wide ? ringH + 12 : 56 + ringH);
   const k = Math.log(F3_HI / F3_LO);
@@ -208,7 +209,8 @@ export function drawF3(s, f3, trail, ring, now, opts = {}) {
   const ctx = s.begin();
   const { w, h } = s;
   const pair = opts.pair; // {unrounded, rounded} for the current tongue position
-  const { ringH, wide, barW, bx, barTop, barBot, yOf } = f3Geometry(w, h);
+  const { ringH, wide, barW, bx, barTop, barBot, yOf } = f3Geometry(w, h, opts.detail);
+  const cluster = opts.detail ? opts.cluster : null; // spectrum only in Detail
 
   // Rounding labels: the unrounded/rounded pair for the vowel being sung
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
@@ -223,7 +225,7 @@ export function drawF3(s, f3, trail, ring, now, opts = {}) {
     ctx.fillText(tiny ? (txt === 'unrounded' ? 'unrnd' : 'rnd') : txt, x, y);
   };
   if (wide) {
-    const lx = Math.min(w - 50, bx + barW + 70);
+    const lx = Math.min(w - 50, bx + barW + (opts.detail ? 70 : 100));
     glyph(pair ? pair.unrounded : '–', lx, barTop + 30, 34);
     small('unrounded', lx, barTop + 48);
     glyph(pair ? pair.rounded : '–', lx, barBot - 22, 34);
@@ -247,14 +249,14 @@ export function drawF3(s, f3, trail, ring, now, opts = {}) {
   stop(F3_HI, rgba(C.orange, 0.04));
   roundRect(ctx, bx, barTop, barW, barBot - barTop, 10);
   ctx.save();
-  ctx.globalAlpha = opts.cluster ? 0.18 : 1; // dim track when the spectrum is drawn on it
+  ctx.globalAlpha = cluster ? 0.18 : 1; // dim track when the spectrum is drawn on it
   ctx.fillStyle = g; ctx.fill();
   ctx.restore();
   ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 1; ctx.stroke();
   // Sideways spectrum (frequency up, level right): your harmonic peaks filled with the bar colours;
   // dashed = a speech-like voice with the same vowel. A clustered F3–F5 (ring) bulges out near 3 kHz.
-  if (opts.cluster) {
-    const { obs, pred } = opts.cluster, n = obs.length;
+  if (cluster) {
+    const { obs, pred } = cluster, n = obs.length;
     const fAt = (i) => 2000 * Math.pow(4500 / 2000, i / (n - 1));
     const xOfDb = (db) => bx + ((Math.max(-60, Math.min(10, db)) + 60) / 70) * barW;
     const idx = []; for (let i = 0; i < n; i++) if (fAt(i) <= F3_HI) idx.push(i);
