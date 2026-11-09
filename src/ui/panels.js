@@ -249,25 +249,27 @@ export function drawF3(s, f3, trail, ring, now, opts = {}) {
   stop(F3_HI, rgba(C.orange, 0.04));
   roundRect(ctx, bx, barTop, barW, barBot - barTop, 10);
   ctx.save();
-  ctx.globalAlpha = cluster ? 0.18 : 1; // dim track when the spectrum is drawn on it
+  ctx.globalAlpha = cluster ? 0.18 : 1; // dim track in Detail (spectrum drawn on it, or waiting for voice)
   ctx.fillStyle = g; ctx.fill();
   ctx.restore();
   ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 1; ctx.stroke();
   // Sideways spectrum (frequency up, level right): your harmonic peaks filled with the bar colours;
   // dashed = a speech-like voice with the same vowel. A clustered F3–F5 (ring) bulges out near 3 kHz.
   if (cluster) {
-    const { obs, pred } = cluster, n = obs.length;
+    const { obs, pred } = cluster, n = pred.length;
     const fAt = (i) => 2000 * Math.pow(4500 / 2000, i / (n - 1));
     const xOfDb = (db) => bx + ((Math.max(-60, Math.min(10, db)) + 60) / 70) * barW;
     const idx = []; for (let i = 0; i < n; i++) if (fAt(i) <= F3_HI) idx.push(i);
     ctx.save();
     roundRect(ctx, bx, barTop, barW, barBot - barTop, 10); ctx.clip();
-    ctx.beginPath();
-    ctx.moveTo(bx, yOf(fAt(idx[0])));
-    for (const i of idx) ctx.lineTo(xOfDb(obs[i]), yOf(fAt(i)));
-    ctx.lineTo(bx, yOf(fAt(idx[idx.length - 1])));
-    ctx.closePath();
-    ctx.fillStyle = g; ctx.fill();
+    if (obs) {
+      ctx.beginPath();
+      ctx.moveTo(bx, yOf(fAt(idx[0])));
+      for (const i of idx) ctx.lineTo(xOfDb(obs[i]), yOf(fAt(i)));
+      ctx.lineTo(bx, yOf(fAt(idx[idx.length - 1])));
+      ctx.closePath();
+      ctx.fillStyle = g; ctx.fill();
+    }
     ctx.setLineDash([3, 3]); ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1.2;
     ctx.beginPath(); idx.forEach((i, k) => (k ? ctx.lineTo : ctx.moveTo).call(ctx, xOfDb(pred[i]), yOf(fAt(i)))); ctx.stroke();
     ctx.restore();

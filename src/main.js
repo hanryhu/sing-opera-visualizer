@@ -7,6 +7,7 @@ import { SynthUI } from './synth.js';
 import { SamplesUI, loadSamples, pickFile } from './sampleplayer.js';
 import { FeedbackRecorder } from './feedback.js';
 import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter, drawVibrato, mapGeometry, f3Geometry } from './ui/panels.js';
+import { predictedClusterCurve } from './dsp/ring.js';
 import { analyzeVibrato, RATE_BAND, RATE_BEST, EXTENT_BAND } from './dsp/vibrato.js';
 
 const FFT = 4096;
@@ -428,7 +429,7 @@ applyLayout();
 /* ---------------- analysis + render loop ---------------- */
 const timeBuf = new Float32Array(FFT);
 const specBuf = new Float32Array(FFT / 2);
-let autoHist = [], lastAutoCheck = 0, pitchHist = [], vibHist = [], formantTrail = [], f3Trail = [], levelHist = [], lastPair = null;
+let lastClusterPred = predictedClusterCurve(550, 1100), autoHist = [], lastAutoCheck = 0, pitchHist = [], vibHist = [], formantTrail = [], f3Trail = [], levelHist = [], lastPair = null;
 const BASE_SPAN = 5, MAX_SPAN = 13; // semitones visible in the pitch trace (max ≈ an octave + margin)
 const ZOOM_HOLD = 10; // s to keep a zoomed-out view after it was last needed
 let lastVib = null; // last confident vibrato reading (bridges brief dropouts)
@@ -578,7 +579,9 @@ function render() {
     extras: view.detail ? extraVowels(voice) : [],
   });
   if (cur && o.voiced) lastPair = roundingPair(cur.f1, cur.f2, shown) || lastPair;
-  drawF3(surf.f3, o?.f3 || 0, f3Trail, o?.ring || 0, now, { ...view, pair: lastPair, target: synthOn ? synth.state.f3 : 0, cluster: o?.cluster });
+  // Detail keeps the spectrum view when silent: the last reference curve (dotted) on a faded bar
+  if (o?.cluster) lastClusterPred = o.cluster.pred;
+  drawF3(surf.f3, o?.f3 || 0, f3Trail, o?.ring || 0, now, { ...view, pair: lastPair, target: synthOn ? synth.state.f3 : 0, cluster: o?.cluster || { pred: lastClusterPred } });
   calib.tick(o, now);
 
   // ---- Level ----
