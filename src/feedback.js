@@ -86,7 +86,7 @@ export class FeedbackRecorder {
     const d = this.h.describe();
     const on = (b) => (b ? 'on' : 'off');
     const parts = [
-      `Detail ${on(d.view.detail)}`, `¼ tones ${on(d.view.quarter)}`, `Follow pitch ${on(d.view.pitchAware)}`,
+      `Detail ${on(d.view.detail)}`, `¼ tones ${on(d.view.quarter)}`,
       `calibrated ${d.calibrated ? 'yes' : 'no'}`,
     ];
     if (d.synth) parts.push(`synth F0 midi ${d.synth.midi} F1 ${d.synth.f1} F2 ${d.synth.f2} F3 ${d.synth.f3} ${d.synth.db} dB${d.synth.vibrato ? ' vib' : ''}`);

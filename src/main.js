@@ -76,7 +76,7 @@ document.querySelectorAll('button[data-voicemode]').forEach((b) =>
 const view = {
   detail: store.get('va.detail', '0') === '1',
   quarter: store.get('va.quarter', '0') === '1',
-  pitchAware: store.get('va.pitchAware', '1') === '1', // circles follow the sung pitch (resonance tuning)
+  pitchAware: true, // circles follow the sung pitch (resonance tuning); the Settings toggle is removed for now
 };
 function bindToggle(btn, k) {
   const sync = () => btn.setAttribute('aria-pressed', String(view[k]));
@@ -86,7 +86,6 @@ function bindToggle(btn, k) {
 bindToggle(els.detailToggle, 'detail');
 els.detailToggle.addEventListener('click', () => applyLayout()); // Detail widens the level bar for its dB scale
 bindToggle(els.quarterToggle, 'quarter');
-bindToggle(document.getElementById('pitchAwareToggle'), 'pitchAware');
 
 // Landmarks: the singer's calibrated vowels replace the defaults
 let landmarks = VOICE_PRESETS[voice].vowels, isCalibrated = false;

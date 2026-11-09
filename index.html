@@ -38,7 +38,6 @@
           <div id="voiceDetected" class="sm-note"></div>
           <div class="sm-sep"></div>
           <button class="sm-row" id="quarterToggle" aria-pressed="false" title="Label quarter-tone pitches"><span>Quarter tones</span><span class="switch" aria-hidden="true"></span></button>
-          <button class="sm-row" id="pitchAwareToggle" aria-pressed="true" title="Move vowel circles with the sung pitch, the way trained singers tune their resonances"><span>Follow pitch <small>(vowel circles)</small></span><span class="switch" aria-hidden="true"></span></button>
           <div class="sm-sep"></div>
           <button class="sm-row" id="calibToggle" aria-pressed="false"><span>Calibrate vowels…</span></button>
           <button class="sm-row" id="helpBtn"><span>Help &amp; sources…</span></button>
@@ -193,14 +192,14 @@
         <p>The map is laid out like the IPA vowel chart: front vowels on the left, close vowels at the top. The dot is your vowel. The circles are the seven Italian vowels for your voice range, or your own vowels after calibration.</p>
         <p><b>High notes.</b> Above about 300 Hz the analyzer fits the harmonic peaks directly. Once F0 rises above a vowel's F1 (about 400 Hz for [i] and [u]), no harmonic lies below F1 to reveal it. Close vowels then read as more open. Listeners hear the same blending of vowels on high notes.</p>
 
-        <h3>Follow pitch</h3>
+        <h3>Resonance tuning</h3>
         <p>Trained singers adjust their resonances as they go higher so that a harmonic stays on a resonance:</p>
         <ul>
           <li>F1 rises to follow the note once the note reaches it.</li>
           <li>High voices raise F2 to the second harmonic.</li>
           <li>Low voices tune F1 to the second harmonic near the top of the range.</li>
         </ul>
-        <p>With <i>Follow pitch</i> on, the circles move in the same way. Faint circles mark their positions at low pitch. Dotted lines (H1, H2, H3) mark the harmonics. Where vowels merge, every circle that contains the dot lights up; at that pitch the sound cannot tell them apart.</p>
+        <p>The vowel circles move in the same way as you sing higher. Faint circles mark their positions at low pitch. Dotted lines (H1, H2, H3) mark the harmonics. Where vowels merge, every circle that contains the dot lights up; at that pitch the sound cannot tell them apart.</p>
 
         <h3>Input</h3>
         <p>Shows the microphone level in dB relative to digital full scale, not sound pressure. Keep it in the green. <i>CLIP</i> means the signal reached its maximum; the sound is distorted and the readings are paused. Lower the microphone level or step back.</p>
@@ -269,14 +268,14 @@
         <p>此图的布局与国际音标元音图相同：前元音在左，闭元音在上。圆点是你的元音。圆圈是你所选音域的七个意大利语元音；校准后则显示你自己的元音。</p>
         <p><b>高音。</b>基频高于约 300 Hz 时，分析器直接拟合谐波峰。当 F0 超过某个元音的 F1（[i] 和 [u] 约为 400 Hz）时，F1 以下已没有谐波可以显示它，闭元音就会显得更开。听众在高音上听到的元音趋同也是同样的原因。</p>
 
-        <h3>跟随音高</h3>
+        <h3>共振调谐</h3>
         <p>训练有素的歌手在唱高时会调整共振，使某个谐波始终落在共振上：</p>
         <ul>
           <li>当音高达到 F1 时，F1 随音高一起上升。</li>
           <li>高音声部把 F2 提高到第二谐波。</li>
           <li>低音声部在音域顶端把 F1 调到第二谐波。</li>
         </ul>
-        <p>开启<i>跟随音高</i>后，圆圈会以同样方式移动。淡色圆圈标出它们在低音时的位置，虚线（H1、H2、H3）标出各谐波。元音重合时，包含圆点的每个圆圈都会亮起；在这个音高上，声音本身无法区分它们。</p>
+        <p>随着你唱高，元音圆圈也会以同样方式移动。淡色圆圈标出它们在低音时的位置，虚线（H1、H2、H3）标出各谐波。元音重合时，包含圆点的每个圆圈都会亮起；在这个音高上，声音本身无法区分它们。</p>
 
         <h3>输入</h3>
         <p>显示麦克风电平，单位是相对于数字满刻度的 dB，而不是声压级。请保持在绿色区域。<i>CLIP</i> 表示信号达到最大值：声音失真，读数暂停。请调低麦克风电平或离远一些。</p>
