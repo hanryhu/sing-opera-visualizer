@@ -389,7 +389,10 @@ body.synth-on #mapcanvas, body.synth-on #f3canvas { cursor: crosshair; touch-act
 @media (max-width: 760px) { .vib-wrap { width: 180px; } }
 
 /* ---------- header v3: live dot, icon buttons, settings menu, exit ---------- */
-.mode-switch button { display: inline-flex; align-items: center; gap: 6px; }
+.mode-switch button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+/* Landing page: plain centred labels (nothing is live yet, so no mic icon / dots) */
+.mode-switch.big .mic-ico, .mode-switch.big .live-dot { display: none !important; }
+.mode-switch.big button { min-width: 0; }
 .live-dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: var(--red); animation: pulse 1.6s infinite; }
 .mic-ico { color: var(--faint); flex: none; }
 body[data-live="mic"] .mode-switch button[data-mode="mic"] .mic-ico { color: var(--red); animation: pulse 1.6s infinite; }
