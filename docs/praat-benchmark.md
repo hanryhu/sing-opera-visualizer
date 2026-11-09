@@ -48,14 +48,40 @@ Median absolute error against ground truth, in %. Each cell is app / Praat with 
 - **Above about 440 Hz, both fail on F1 in the same way.** Once f0 is above the true F1, no harmonic falls near F1, so it can't be measured by any method. This is physics, not a bug. It's why the app moves its vowel targets with pitch.
 - On the real arias, the app's formants are within 5–12 % of Praat's for F1, 5–25 % for F2 (worst on the mezzo) and 3–10 % for F3. Neither is ground truth there.
 
-## What to take from Praat
-1. **Note-level octave decision.** This is Praat's path-finder idea made causal. While a note is held, accumulate d′(2τ)/d′(τ). If it stays clearly below 1 for about 200 ms, show the lower octave for the rest of the note. This targets the 14 % of tenor and bass frames above. The risk is period doubling (vocal fry, pressed onsets), which looks the same within a single frame. Validate with this harness plus test.html before shipping: an earlier per-frame harmonic check made results worse.
-2. **Adaptive voicing gate.** Praat sets its silence threshold relative to the loudest part of the file. The app uses a fixed −45 dB, so it drops 20–25 % more frames on quiet low-voice passages. A live version would use the recent peak level, for example over the last 10 s.
-3. **Not worth adopting:**
-   - Burg LPC: no accuracy gain here, and it needs per-voice tuning.
-   - Praat's formant tracker: our median and exponential smoothing already hold steady.
-   - Jitter, shimmer and HNR: clinical measures, outside the app's purpose.
-   - Cepstral peak prominence, a measure of how clear versus breathy a voice is, would be the only voice-quality measure worth considering later.
+## What we took from Praat (implemented 2026-11-08, `src/dsp/analyzer.js`)
+1. **Note-level octave decision.** This is Praat's path-finder idea made causal, in `octaveCheck`, with the `OCT_*` constants.
+   - Over a held note, the app averages d′(τ) and d′(2τ), the YIN aperiodicity at the read period and at twice that period. It counts only frames read in the note's highest octave.
+   - It switches to the lower octave for the rest of the note when all of these hold:
+     - The note has lasted at least 200 ms.
+     - Mean d′(2τ) is below half of mean d′(τ), and mean d′(τ) is above 0.012.
+     - The note sits more than 10 semitones above the singer's typical pitch, the 20 s running median (`updateTypical`).
+   - The range condition protects ordinary notes with period doubling, where alternate cycles differ, and fry.
+2. **Continuation voicing.** The first guess was a loudness-relative gate, but the missed frames turned out to be loud, around −21 dB. Their aperiodicity was 0.25–0.27, just above the app's 0.25 cutoff, because vibrato and reverb smear the 43 ms window.
+   - Praat accepts these frames because its voicing threshold is lenient and its path costs make staying on a note cheap.
+   - The app now accepts a frame with aperiodicity up to 0.4 when a note is already sounding and the frame is within 1.5 semitones of it. Onsets still need 0.25.
+
+### After the fixes
+| voice | voiced (app / Praat) | within 50 c of Praat | app an octave above Praat |
+|---|---|---|---|
+| bass | 60 → **72 %** / 84 % | 67 → **75 %** | 14.6 → 12.2 % |
+| baritone | 58 → **71 %** / 78 % | 83 → **89 %** | 0.2 → 0.3 % |
+| tenor | 91 → 93 % / 91 % | 83 → **94 %** | 14.3 → **3.7 %** |
+| mezzo | 80 → **90 %** / 92 % | 85 → **88 %** | 0.7 % |
+| soprano | 85 → **89 %** / 93 % | 88 % | 3.8 % |
+
+The synthetic weak-fundamental scenario was 6 s on G3, then F4 with h1 and h3 20 dB down. The app now reads 83 % of the F4 frames correctly, up from 0 %. The rest is the 200 ms it takes to decide.
+
+The synthetic pitch and formant tables are unchanged, and test.html is unchanged (pitch within ±1.3 c, 2 ms per frame).
+
+What's left:
+- **Bass, 12 % octave high.** On its disputed notes (Praat about 200 Hz, app about 400 Hz), d′(2τ) is no lower than d′(τ) within the 43 ms window. Vibrato smears the longer lag, so the evidence isn't there frame by frame. A longer window for the 2τ test might help.
+- **Period-doubling scenario.** C5 with alternate cycles 15 % weaker reads as the lower octave in both Praat and the app, because YIN itself picks the long period. So it doesn't test the guard. A real singer's genuine high note with strong period doubling, sung more than 10 semitones above their median, would be lowered wrongly. In trained singing that is rare.
+
+## Not worth adopting
+- Burg LPC: no accuracy gain here, and it needs per-voice tuning.
+- Praat's formant tracker: our median and exponential smoothing already hold steady.
+- Jitter, shimmer and HNR: clinical measures, outside the app's purpose.
+- Cepstral peak prominence, a measure of how clear versus breathy a voice is, would be the only voice-quality measure worth considering later.
 
 ## Re-running
 ```bash

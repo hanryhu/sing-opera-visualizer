@@ -58,3 +58,36 @@ for v, (f1, f2, f3) in VOWELS.items():
             truth[name] = {'vowel': v, 'f0': f0, 'vib': vib, 'f1': f1, 'f2': f2, 'f3': f3}
 json.dump(truth, open('truth.json', 'w'), indent=0)
 print(len(truth), 'files')
+
+
+# ---- Octave-check scenarios (long files: the app needs ~3 s of singing to know the typical pitch) ----
+# 6 s on G3 (196 Hz), then 3 s on a high note shaped two ways:
+#   weakf0: true f0 = F4 349 Hz, h1/h3 20 dB down (R1 on 2f0 + weak fundamental) -> correct answer 349
+#   pd:     true pitch = C5 523 Hz with period doubling (alternate cycles 15% weaker) -> perceived 523
+def harmonic_tone(f0, dur, amp=lambda k: 1.0, vib=1):
+    t = np.arange(int(FS * dur)) / FS
+    ph = 2 * np.pi * np.cumsum(f0 * 2 ** ((60 * np.sin(2 * np.pi * 6 * t) if vib else 0 * t) / 1200)) / FS
+    x = np.zeros_like(t)
+    for k in range(1, int(5500 / f0) + 1):
+        x += amp(k) * np.sin(k * ph) / k
+    return x
+
+
+def shape(x, F):
+    for f, bw in zip(F, BW):
+        x = resonate(x, f, bw)
+    return x
+
+
+A_ = (780, 1430, 2600, 3500, 4500)
+low = shape(harmonic_tone(196, 6.0), A_)
+weak = shape(harmonic_tone(349, 3.0, lambda k: 0.1 if k in (1, 3) else 1.0), A_)
+# period doubling: f0/2 grid, even partials = the 523 Hz tone, odd partials = (1-0.85)/(1+0.85) relative
+r = (1 - 0.85) / (1 + 0.85)
+pd = shape(harmonic_tone(261.5, 3.0, lambda k: 1.0 if k % 2 == 0 else r * k / max(1, k)), A_)
+for name, hi, f_hi in (('oct_weakf0', weak, 349), ('oct_pd', pd, 523)):
+    x = np.concatenate([low / np.abs(low).max(), hi / np.abs(hi).max()])
+    write(name + '.wav', x)
+    truth[name] = {'vowel': 'a', 'f0': f_hi, 'vib': 1, 'f1': 780, 'f2': 1430, 'f3': 2600, 'long': True}
+json.dump(truth, open('truth.json', 'w'), indent=0)
+print('octave scenarios written')

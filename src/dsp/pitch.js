@@ -70,6 +70,13 @@ export function yin(buf, sampleRate, fmin = 60, fmax = 1500, threshold = 0.15) {
     for (let t = lo; t <= hi; t++) if (d[t] < d[tau]) tau = t;
   }
   const aperiodicity = d[tau];
+  // Periodicity at twice the period: much lower than d[tau] means alternate cycles differ, i.e. the true
+  // fundamental may be an octave down (weak f0 with a dominant 2nd harmonic). Used for note-level octave checks.
+  let aperiodicity2 = NaN;
+  if (2 * tau + 2 <= tauMax + 1) {
+    aperiodicity2 = Infinity;
+    for (let t = 2 * tau - 2; t <= 2 * tau + 2; t++) if (d[t] < aperiodicity2) aperiodicity2 = d[t];
+  }
 
   // Parabolic interpolation
   let betterTau = tau;
@@ -78,7 +85,7 @@ export function yin(buf, sampleRate, fmin = 60, fmax = 1500, threshold = 0.15) {
     const denom = 2 * (2 * s1 - s2 - s0);
     if (denom !== 0) betterTau = tau + (s2 - s0) / denom;
   }
-  return { f0: sampleRate / betterTau, aperiodicity };
+  return { f0: sampleRate / betterTau, aperiodicity, aperiodicity2 };
 }
 
 export const freqToMidi = (f, a4 = 440) => 69 + 12 * Math.log2(f / a4);

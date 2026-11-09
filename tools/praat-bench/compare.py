@@ -2,7 +2,9 @@
 import json
 import numpy as np
 
-P = json.load(open('praat.json')); A = json.load(open('app.json')); T = json.load(open('truth.json'))
+import sys
+P = json.load(open('praat.json')); A = json.load(open(sys.argv[1] if len(sys.argv) > 1 else 'app.json')); T = json.load(open('truth.json'))
+LONG = {n: T.pop(n) for n in [k for k in T if T[k].get('long')]}
 
 
 def interp(src, key, ts):
@@ -93,3 +95,12 @@ for v in ['bass', 'baritone', 'tenor', 'mezzo', 'soprano']:
         v, np.mean(~np.isnan(a)) * 100, np.mean(~np.isnan(p)) * 100, near, octv, other, *fd))
     # median Praat f0 for context
     print(f'            median f0 Praat {np.nanmedian(p):.0f} Hz')
+
+print()
+print("OCTAVE SCENARIOS (6 s on G3, then a high note): share of high-note frames per reading")
+for name, tr in LONG.items():
+    ts = np.arange(6.4, 8.9, 0.01)
+    for who, src, lag in (('app', A[name], LAG), ('praat', P[name], 0)):
+        p = interp(src, 'f0', ts + lag); v = p[~np.isnan(p)]
+        e = cents(v, tr['f0'])
+        print(f'  {name:11} {who:5}: correct {np.mean(np.abs(e) < 100)*100:5.1f}%  octave up {np.mean(np.abs(e-1200) < 100)*100:5.1f}%  octave down {np.mean(np.abs(e+1200) < 100)*100:5.1f}%  voiced {len(v)/len(ts)*100:4.0f}%')

@@ -18,6 +18,20 @@ const MAX_APERIODICITY = 0.25;
 const QUIET_MIN_F0 = 70;        // keeps mains hum (50/60 Hz) out of the quiet path
 const VIBRATO_WINDOW = 0.45; // s — averaging window for the tuner decision
 const HOLD = 0.15; // s — keep tracks alive through short gaps
+// Continuation (after Praat's path finder, which makes staying on a note cheap and starting one costly):
+// once a note is sounding, a less clean frame on the same pitch still counts as voiced. Vibrato and
+// reverb push sung frames just past MAX_APERIODICITY; onsets must still pass the strict test.
+const CONT_MAX_APERIODICITY = 0.4;
+const CONT_MAX_SEMITONES = 1.5;
+// Note-level octave check: a weak fundamental under a dominant 2nd harmonic (R1 tuned to 2f0, old
+// recordings) reads an octave high frame by frame. If, over a held note, the double period is clearly
+// more periodic AND the reading sits far above the singer's typical pitch, show the lower octave.
+const OCT_TAU = 0.3;           // s, averaging of the two aperiodicities over the note
+const OCT_MIN_AGE = 0.2;       // s of note before deciding
+const OCT_RATIO = 0.5;         // mean d'(2τ) must be below this fraction of mean d'(τ)
+const OCT_MIN_D1 = 0.012;      // ...and d'(τ) not already ~perfect (a clean tone has nothing to prefer)
+const OCT_ABOVE_TYPICAL = 10;  // semitones above the singer's median pitch
+const TYPICAL_WIN = 20;        // s of voiced pitch for the median
 
 class Track {
   constructor(tau) { this.tau = tau; this.hist = []; this.value = 0; this.lastT = -1; }
@@ -49,6 +63,9 @@ export class Analyzer {
     this.pitchHist = []; // {t, midi}
     this.lastVoicedT = -1;
     this.clusterObs = null; this.clusterPred = null; this.clusterT = -1;
+    this.oct = { hi: 0, t: -1, start: 0, d1: 0, d2: 0, n: 0, lowered: false };
+    this.typHist = []; this.typical = 0; this.typT = -1; this.typCalcT = -1;
+    this.lastRawMidi = 0;
   }
 
   /**
@@ -85,14 +102,18 @@ export class Analyzer {
 
     const wasVoiced = this.lastVoicedT >= 0 && t - this.lastVoicedT <= HOLD;
     if (rmsDb > QUIET_GATE_DB) {
-      const { f0, aperiodicity } = yin(frame.subarray(tail), this.sr);
-      const loudOk = rmsDb > GATE_DB - (wasVoiced ? HYSTERESIS_DB : 0) && aperiodicity < MAX_APERIODICITY;
+      const { f0, aperiodicity, aperiodicity2 } = yin(frame.subarray(tail), this.sr);
+      const loud = rmsDb > GATE_DB - (wasVoiced ? HYSTERESIS_DB : 0);
+      const sameNote = wasVoiced && f0 > 0 && Math.abs(freqToMidi(f0, this.a4) - this.lastRawMidi) < CONT_MAX_SEMITONES;
+      const loudOk = loud && (aperiodicity < MAX_APERIODICITY || (sameNote && aperiodicity < CONT_MAX_APERIODICITY));
       const quietOk = aperiodicity < QUIET_MAX_APERIODICITY && f0 >= QUIET_MIN_F0;
       if (f0 >= 60 && f0 <= 1500 && (loudOk || quietOk)) {
         out.voiced = true;
         // Remove the sharp bias from inharmonic sources (piano) by re-measuring on the low partials
         // Remove the sharp bias from inharmonic sources (piano) by re-measuring on the low partials
         let midi = freqToMidi(refinePitch(frame.subarray(tail), this.sr, f0), this.a4);
+        this.lastRawMidi = midi;
+        midi = this.octaveCheck(midi, aperiodicity, aperiodicity2, t);
         // Pitch cleanup. Recent raw readings (reset after a gap in voicing):
         if (t - this.lastVoicedT > HOLD) this.rawHist = [];
         this.rawHist = this.rawHist || [];
@@ -111,6 +132,7 @@ export class Analyzer {
         if (this.foldHist.length > 5) this.foldHist.shift();
         midi = [...this.foldHist].sort((a, b) => a - b)[this.foldHist.length >> 1];
         out.midiRaw = midi;
+        this.updateTypical(midi, t);
         out.f0 = 440 * Math.pow(2, (midi - 69) / 12) * (this.a4 / 440);
         this.lastVoicedT = t;
         if (this.pitchHist.length && Math.abs(this.pitchHist.at(-1).midi - out.midiRaw) > 2.5) {
@@ -166,6 +188,45 @@ export class Analyzer {
     out.tracking = out.midiMean > 0;
     out.cluster = this.clusterObs && t - this.clusterT <= 0.5 ? { obs: this.clusterObs, pred: this.clusterPred } : null;
     return out;
+  }
+
+  /** Note-level octave decision (see OCT_*). Returns the MIDI reading, an octave lower if warranted. */
+  octaveCheck(midi, d1, d2, t) {
+    const o = this.oct;
+    const live = o.t >= 0 && t - o.t <= HOLD;
+    // The same note may be read an octave or two apart on different frames. o.hi = the note in the
+    // highest octave it has been read in; only frames read there are compared (d1 = d'(τ), d2 = d'(2τ)).
+    const k = live ? Math.round((midi - o.hi) / 12) : 0;
+    const sameNote = live && Math.abs(k) <= 2 && Math.abs(midi - 12 * k - o.hi) < 2;
+    if (!sameNote) { o.hi = midi; o.start = t; o.d1 = 0; o.d2 = 0; o.n = 0; o.lowered = false; }
+    else if (k > 0) { o.hi = midi; o.d1 = 0; o.d2 = 0; o.n = 0; } // first read an octave higher: restart evidence
+    else if (k === 0) o.hi += 0.1 * (midi - o.hi);
+    const dt = sameNote ? t - o.t : 0;
+    o.t = t;
+    const upper = Math.abs(midi - o.hi) < 2;
+    if (upper && Number.isFinite(d2)) {
+      // Running means over the note (exponential, ~OCT_TAU), robust to single-frame noise
+      o.n++;
+      const a = Math.max(1 / o.n, 1 - Math.exp(-dt / OCT_TAU));
+      o.d1 += a * (d1 - o.d1); o.d2 += a * (d2 - o.d2);
+    }
+    if (!o.lowered && o.n && t - o.start >= OCT_MIN_AGE && o.d1 > OCT_MIN_D1 && o.d2 < OCT_RATIO * o.d1
+      && this.typical && o.hi - this.typical > OCT_ABOVE_TYPICAL) o.lowered = true;
+    return o.lowered && upper ? midi - 12 : midi;
+  }
+
+  /** Running median of the singer's pitch (last TYPICAL_WIN s of voicing, sampled every 50 ms). */
+  updateTypical(midi, t) {
+    if (t - this.typT >= 0.05) {
+      this.typHist.push({ t, m: midi });
+      this.typT = t;
+    }
+    while (this.typHist.length && t - this.typHist[0].t > TYPICAL_WIN) this.typHist.shift();
+    if (t - this.typCalcT >= 0.5) {
+      this.typCalcT = t;
+      const ms = this.typHist.map((p) => p.m).sort((a, b) => a - b);
+      this.typical = ms.length >= 60 ? ms[ms.length >> 1] : 0; // needs ~3 s of singing
+    }
   }
 
   /** Singer's-formant ratio: energy 2.5–3.5 kHz relative to 0.3–2 kHz, dB. */
