@@ -31,6 +31,7 @@ export class FeedbackRecorder {
     const $ = (id) => document.getElementById(id);
     this.el = { btn: $('feedbackBtn'), panel: $('feedbackPanel'), close: $('feedbackClose'), summary: $('feedbackSummary'), links: $('feedbackLinks') };
     this.rec = null;
+    this.idleHtml = this.el.btn.innerHTML; // record icon
     this.el.btn.addEventListener('click', () => (this.rec ? this.stop() : this.start()));
     this.el.close.addEventListener('click', () => { this.el.panel.hidden = true; });
     // Never keep recording a tab the user has left
@@ -71,7 +72,8 @@ export class FeedbackRecorder {
     const rec = this.rec;
     if (!rec) return;
     const el = performance.now() / 1000 - rec.tStart;
-    this.el.btn.textContent = `■ Stop · ${Math.max(0, Math.ceil(MAX_SECONDS - el))}s`;
+    this.el.btn.innerHTML = `<span class="rec-stop" aria-hidden="true"></span><span class="rec-secs">${Math.max(0, Math.ceil(MAX_SECONDS - el))}</span>`;
+    this.el.btn.setAttribute('aria-label', 'Stop recording');
     if (el >= MAX_SECONDS) { this.stop(); return; }
     setTimeout(() => this.tick(), 200);
   }
@@ -134,7 +136,8 @@ export class FeedbackRecorder {
     if (!rec) return;
     this.rec = null;
     this.el.btn.classList.remove('recording');
-    this.el.btn.textContent = '● Record';
+    this.el.btn.innerHTML = this.idleHtml;
+    this.el.btn.setAttribute('aria-label', 'Record');
     try { rec.session.tap.disconnect(rec.dest); } catch { /* session may already be gone */ }
     const seconds = performance.now() / 1000 - rec.tStart;
     const blob = await new Promise((res) => {
