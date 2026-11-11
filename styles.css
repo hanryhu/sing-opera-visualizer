@@ -153,7 +153,7 @@ body:not(.learn-on) #learnHelp { display: none; } /* Pitch hints: a Learn settin
 .nv-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 8px; }
 .nv-chip { font: 400 34px/1 "Noto Music"; padding: 0 0 10px; height: 44px; overflow: hidden; }
 .opt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.sig-grid { display: grid; grid-template-columns: repeat(4, 1fr) 1.6fr; gap: 6px; margin-bottom: 8px; }
+.sig-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 8px; }
 .wide-chip { width: 100%; margin-bottom: 10px; }
 .meas-row { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
 .meas-row span:first-child { margin-right: auto; }

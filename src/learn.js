@@ -199,9 +199,9 @@ export class LearnUI {
     }
     if (this.page === 2) { // Tempo
       const T = this.tempo;
-      const LABEL = { cut: '\u00A2', '3/4': '3/4', '4/4': '4/4', '6/8': '6/8', other: t('Other') };
+      const LABEL = { cut: '\u00A2', '3/4': '3/4', '4/4': '4/4', '6/8': '6/8', other: '…' };
       this.el.rerollMenu.innerHTML = head +
-        `<div class="sig-grid">${SIG_CHOICES.map((k) => `<button type="button" class="iv-chip" data-sig="${k}" aria-pressed="${T.sigs.includes(k)}"${k === 'cut' ? ` title="${t('Cut time')}"` : ''}>${LABEL[k]}</button>`).join('')}</div>` +
+        `<div class="sig-grid">${SIG_CHOICES.map((k) => `<button type="button" class="iv-chip" data-sig="${k}" aria-pressed="${T.sigs.includes(k)}"${k === 'cut' ? ` title="${t('Cut time')}"` : k === 'other' ? ` title="${t('Other')}" aria-label="${t('Other')}"` : ''}>${LABEL[k]}</button>`).join('')}</div>` +
         `<button type="button" class="iv-chip wide-chip" data-tchg aria-pressed="${!!T.changes}">${t('Time signature changes')}</button>` +
         `<div class="meas-row"><span>${t('Bars')}</span>` +
         `<button type="button" class="step" data-meas="min:-1">−</button><b>${T.min}</b><button type="button" class="step" data-meas="min:1">+</button>` +
