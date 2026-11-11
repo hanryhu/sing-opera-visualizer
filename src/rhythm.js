@@ -36,7 +36,7 @@ const eq = (a, b) => Math.abs(a - b) < EPS;
 
 /** How a duration is written: base value, dots, tuplet (3 = triplet). Null if not writable as one note. */
 export function noteType(d) {
-  const table = [[4, 'w', 0], [3, 'h', 1], [2, 'h', 0], [1.5, 'q', 1], [1, 'q', 0], [0.75, '8', 1], [0.5, '8', 0], [0.25, '16', 0]];
+  const table = [[6, 'w', 1], [4, 'w', 0], [3, 'h', 1], [2, 'h', 0], [1.5, 'q', 1], [1, 'q', 0], [0.75, '8', 1], [0.5, '8', 0], [0.25, '16', 0]];
   for (const [v, base, dots] of table) if (eq(d, v)) return { base, dots, tuplet: 0 };
   if (eq(d, 2 / 3)) return { base: 'q', dots: 0, tuplet: 3 };
   if (eq(d, 1 / 3)) return { base: '8', dots: 0, tuplet: 3 };
@@ -50,8 +50,15 @@ function allowedDurations(R, meter) {
     out.push(BASE[v]);
     if (R.dotted && v !== '16' && v !== 'w') out.push(BASE[v] * 1.5); // dotted 8th, quarter, half
   }
-  // compound meters are built on the dotted quarter: allow it whenever quarters are allowed
-  if (meter.compound && R.values.includes('q') && !out.includes(1.5)) out.push(1.5);
+  // Compound meters (6/8, 9/8, 12/8) are built on dotted beats, 6/4 on the dotted half: a dotted note a whole
+  // number of beats long is a basic value there, available whenever its plain value is (Dotted or not)
+  const beat = meter.beats[0];
+  if (meter.compound || meter.beats.every((b) => b === 3)) {
+    for (const [v, base] of [[1.5, 'q'], [3, 'h'], [6, 'w']]) {
+      const len = meter.beats.reduce((a, b) => a + b, 0);
+      if (R.values.includes(base) && v >= beat - 1e-6 && Math.abs(v / beat - Math.round(v / beat)) < 1e-6 && v <= len + 1e-6) out.push(v);
+    }
+  }
   return [...new Set(out)].sort((a, b) => b - a);
 }
 
@@ -208,9 +215,8 @@ export function generateRhythm(R, T, count) {
 
 /* ---------------- rhythm from text ---------------- */
 /** Split a duration starting at `pos` into writable pieces (tied), breaking at beats where needed. */
-function writable(pos, dur, beatsAbs) {
+function writable(pos, dur, beatsAbs, VALUES = [6, 4, 3, 2, 1.5, 1, 0.75, 0.5, 0.25]) {
   const out = [];
-  const VALUES = [4, 3, 2, 1.5, 1, 0.75, 0.5, 0.25];
   let guard = 0;
   while (dur > EPS && guard++ < 40) {
     const onBeat = beatsAbs.some((b) => eq(b, pos));
@@ -235,7 +241,7 @@ export function generateTextRhythm(R, T, lines, minBars, maxBars) {
   const plan = meterPlan(T, maxBars + 12);
   const measures = [], notes = [];
   let mi = -1, bi = 0, t0 = 0, meter = null, bounds = null, D = null;
-  const ALL = [4, 3, 2, 1.5, 1, 0.75, 0.5, 0.25];
+  const ALL = [6, 4, 3, 2, 1.5, 1, 0.75, 0.5, 0.25];
   const newBar = () => {
     if (meter) t0 += bounds[bounds.length - 1] - (measures[measures.length - 1].offset || 0);
     mi += 1;
@@ -408,8 +414,12 @@ export function generateTextRhythm(R, T, lines, minBars, maxBars) {
       let seg = Math.min(left, end - pos);
       if (seg <= EPS) seg = left; // past the last barline (shouldn't happen): keep the rest in this bar
       const type = noteType(seg);
-      if (type) pieces.push({ start: pos, dur: seg, type, tup: n.tup, m });
-      else for (const p of writable(pos, seg, beatsAbs)) pieces.push({ ...p, type: noteType(p.dur) || noteType(0.25), tup: null, m });
+      // with Dotted off, a held note is written as tied plain notes (compound time keeps its dotted beats)
+      const Dm = allowedDurations(R, METERS[measures[m].meter]);
+      const dotOk = (d) => R.dotted || !noteType(d)?.dots || Dm.some((x) => eq(x, d));
+      const vals = [6, 4, 3, 2, 1.5, 1, 0.75, 0.5, 0.25].filter(dotOk);
+      if (type && dotOk(seg)) pieces.push({ start: pos, dur: seg, type, tup: n.tup, m });
+      else for (const p of writable(pos, seg, beatsAbs, vals)) pieces.push({ ...p, type: noteType(p.dur) || noteType(0.25), tup: null, m });
       pos += seg; left -= seg;
     }
     return { start: n.start, dur: n.dur, pieces, strong: n.strong, m: pieces[0].m, syl: n.syl };
