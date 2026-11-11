@@ -177,7 +177,10 @@ export function tonalLine(style, count, strong, lo, hi) {
   const inRange = (p) => midiOf(p) >= lo && midiOf(p) <= hi;
 
   const ps = [];
-  const starts = S.chord.filter(inRange);
+  // start on the tonic or the fifth (whole-tone has no fifth: tonic)
+  const fifthIdx = S.st.indexOf(7);
+  const homes = () => [0, fifthIdx].filter((x) => x >= 0).flatMap((x) => [x - N, x, x + N]).filter(inRange);
+  const starts = homes();
   ps.push(starts.length ? pick(starts) : 0);
   const out = [];
   let forced = null;
@@ -201,9 +204,10 @@ export function tonalLine(style, count, strong, lo, hi) {
     for (const o of opts) { r -= o.w; if (r <= 0) { q = o.q; break; } }
     ps.push(q);
   }
-  // Cadence: tonic nearest the line, approached by step from above or below
+  // Cadence: end on the tonic (or now and then the fifth), nearest the line, approached by step
   const lastP = ps[ps.length - 1];
-  let T = Math.round(lastP / N) * N;
+  const goal = fifthIdx >= 0 && Math.random() < 0.3 ? fifthIdx : 0;
+  let T = Math.round((lastP - goal) / N) * N + goal;
   if (!inRange(T)) T += midiOf(T) < lo ? N : -N;
   let pen = lastP > T ? T + 1 : T - 1;
   if (pen === lastP) pen = lastP > T ? T - 1 : T + 1;
@@ -221,7 +225,7 @@ export function tonalLine(style, count, strong, lo, hi) {
   for (let i = 0; i < ps.length; i++) {
     let midi = midiOf(ps[i]), ln = letterOf(ps[i]);
     // minor: raised leading tone just before the final tonic
-    if (S.leading && i === ps.length - 2 && ps[i] < ps[i + 1]) midi += 1;
+    if (S.leading && i === ps.length - 2 && ps[i] < ps[i + 1] && ((ps[i + 1] % N) + N) % N === 0) midi += 1;
     out.push({ midi, ln });
   }
   // Chromatic approach notes: a semitone below (raised lower letter) or above (lowered upper letter)

@@ -153,6 +153,8 @@ body:not(.learn-on) #learnHelp { display: none; } /* Pitch hints: a Learn settin
 .nv-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 8px; }
 .nv-chip { font: 400 34px/1 "Noto Music"; padding: 0 0 10px; height: 44px; overflow: hidden; }
 .opt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.lang-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.lang-grid .iv-chip { display: grid; place-items: center; min-height: 34px; font-size: 13px; }
 .sig-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 8px; }
 .wide-chip { width: 100%; margin-bottom: 10px; }
 .meas-row { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
@@ -160,6 +162,7 @@ body:not(.learn-on) #learnHelp { display: none; } /* Pitch hints: a Learn settin
 .meas-row b { color: var(--text); min-width: 20px; text-align: center; font-variant-numeric: tabular-nums; }
 .meas-row .step { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--panel); color: var(--text); font: 600 16px/1 var(--ui); cursor: pointer; }
 .meas-row .dash { color: var(--faint); }
+.meas-row .step:disabled { opacity: .35; cursor: default; }
 .ton-seg button { flex: 1; }
 .style-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; min-width: 220px; }
 .style-grid .iv-chip { font-size: 13px; padding: 8px 6px; }

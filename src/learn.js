@@ -6,7 +6,8 @@ import { Surface, C } from './ui/panels.js';
 import { midiToFreq } from './dsp/pitch.js';
 import { t } from './i18n.js';
 import { spellLine, nextAtonal, tonalLine, keySigMap, TONAL_STYLES } from './melody.js';
-import { generateRhythm, METERS, SIG_CHOICES, NOTE_VALUES, DEFAULT_RHYTHM, DEFAULT_TEMPO } from './rhythm.js';
+import { generateRhythm, generateTextRhythm, METERS, SIG_CHOICES, NOTE_VALUES, DEFAULT_RHYTHM, DEFAULT_TEMPO } from './rhythm.js';
+import { lyricLines, LANGS } from './lyrics.js';
 
 /** Intervals offered for generation (semitones). */
 export const INTERVALS = [
@@ -41,9 +42,9 @@ function assemble(rh, mids, spelled, voice, extra = {}) {
 }
 
 /** Tonal phrase in a style (pentatonic, diatonic, blues, chromatic, modern), with a key signature. */
-export function generateTonalPhrase({ style, voice = 'low', measures = 4, rhythm: R = DEFAULT_RHYTHM, tempo: T = DEFAULT_TEMPO }) {
+export function generateTonalPhrase({ style, voice = 'low', measures = 4, rhythm: R = DEFAULT_RHYTHM, tempo: T = DEFAULT_TEMPO, rh = null }) {
   const [lo, hi] = RANGE[voice] || RANGE.low;
-  const rh = generateRhythm(R, T, measures);
+  rh ||= generateRhythm(R, T, measures);
   const line = tonalLine(style, rh.events.length, rh.events.map((e) => e.strong), lo, hi);
   const mids = line.notes.map((n) => n.midi);
   const fallback = spellLine(mids.map((midi) => ({ midi })));
@@ -52,11 +53,11 @@ export function generateTonalPhrase({ style, voice = 'low', measures = 4, rhythm
 }
 
 /** Random atonal phrase. */
-export function generatePhrase({ intervals, voice = 'low', measures = 4, rhythm: R = DEFAULT_RHYTHM, tempo: T = DEFAULT_TEMPO }) {
+export function generatePhrase({ intervals, voice = 'low', measures = 4, rhythm: R = DEFAULT_RHYTHM, tempo: T = DEFAULT_TEMPO, rh = null }) {
   const [lo, hi] = RANGE[voice] || RANGE.low;
   const steps = INTERVALS.filter((i) => intervals.includes(i.id)).map((i) => i.st);
   if (!steps.length) steps.push(1, 2);
-  const rh = generateRhythm(R, T, measures);
+  rh ||= generateRhythm(R, T, measures);
   const mids = [Math.round((lo + hi) / 2 - 3 + rnd(7))];
   while (mids.length < rh.events.length) mids.push(nextAtonal(mids, steps, lo, hi));
   return assemble(rh, mids, spellLine(mids.map((midi) => ({ midi }))), voice);
@@ -102,7 +103,12 @@ export class LearnUI {
     const load = (k, d) => { try { return { ...d, ...JSON.parse(localStorage.getItem(k) || '{}') }; } catch { return { ...d }; } };
     this.rhythm = load('va.learn.rhythm', DEFAULT_RHYTHM);
     this.tempo = load('va.learn.tempo', DEFAULT_TEMPO);
-    this.page = 0; // dice menu page: Pitch, Rhythm, Tempo
+    this.page = 0; // dice menu page: Pitch, Rhythm, Tempo, Language
+    try {
+      const saved = localStorage.getItem('va.learn.lang');
+      this.lang = saved && (saved === 'none' || LANGS.some((l) => l.id === saved)) ? saved
+        : (navigator.language || '').toLowerCase().startsWith('zh') ? 'zhS' : 'en';
+    } catch { this.lang = 'en'; }
     this.phrase = null;
     this.playing = null;
     this.barX = null;
@@ -170,10 +176,11 @@ export class LearnUI {
         localStorage.setItem('va.learn.intervals', JSON.stringify(this.intervals)); localStorage.setItem('va.learn.kind', this.kind);
         localStorage.setItem('va.learn.tonality', this.tonality); localStorage.setItem('va.learn.style', this.style);
         localStorage.setItem('va.learn.rhythm', JSON.stringify(this.rhythm)); localStorage.setItem('va.learn.tempo', JSON.stringify(this.tempo));
+        localStorage.setItem('va.learn.lang', this.lang);
       } catch { /* ignore */ }
     };
     const keep = (e) => { e.stopPropagation(); save(); this.renderMenus(); this.el.rerollMenu.hidden = false; };
-    const PAGES = ['Pitch', 'Rhythm', 'Tempo'];
+    const PAGES = ['Pitch', 'Rhythm', 'Tempo', 'Language'];
     const head = `<div class="pg-head"><button type="button" class="pg-arrow" data-pg="-1" aria-label="${t('Previous')}">‹</button>` +
       `<span>${t(PAGES[this.page])}</span><button type="button" class="pg-arrow" data-pg="1" aria-label="${t('Next')}">›</button></div>`;
     const bindPages = () => this.el.rerollMenu.querySelectorAll('[data-pg]').forEach((b) => b.addEventListener('click', (e) => {
@@ -197,6 +204,15 @@ export class LearnUI {
       this.el.rerollMenu.querySelectorAll('[data-ropt]').forEach((b) => b.addEventListener('click', (e) => { R[b.dataset.ropt] = !R[b.dataset.ropt]; keep(e); }));
       return;
     }
+    if (this.page === 3) { // Language: words under the notes, or none
+      const NONE = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6.5 17.5l11-11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+      this.el.rerollMenu.innerHTML = head + `<div class="lang-grid">` +
+        `<button type="button" class="iv-chip" data-lang="none" aria-pressed="${this.lang === 'none'}" title="${t('No words')}" aria-label="${t('No words')}">${NONE}</button>` +
+        LANGS.map((l) => `<button type="button" class="iv-chip" data-lang="${l.id}" aria-pressed="${this.lang === l.id}">${l.label}</button>`).join('') + `</div>`;
+      bindPages();
+      this.el.rerollMenu.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', (e) => { this.lang = b.dataset.lang; keep(e); }));
+      return;
+    }
     if (this.page === 2) { // Tempo
       const T = this.tempo;
       const LABEL = { cut: '\u00A2', '3/4': '3/4', '4/4': '4/4', '6/8': '6/8', other: '…' };
@@ -204,9 +220,9 @@ export class LearnUI {
         `<div class="sig-grid">${SIG_CHOICES.map((k) => `<button type="button" class="iv-chip" data-sig="${k}" aria-pressed="${T.sigs.includes(k)}"${k === 'cut' ? ` title="${t('Cut time')}"` : k === 'other' ? ` title="${t('Other')}" aria-label="${t('Other')}"` : ''}>${LABEL[k]}</button>`).join('')}</div>` +
         `<button type="button" class="iv-chip wide-chip" data-tchg aria-pressed="${!!T.changes}">${t('Time signature changes')}</button>` +
         `<div class="meas-row"><span>${t('Bars')}</span>` +
-        `<button type="button" class="step" data-meas="min:-1">−</button><b>${T.min}</b><button type="button" class="step" data-meas="min:1">+</button>` +
+        `<button type="button" class="step" data-meas="min:-1"${T.min <= 1 ? ' disabled' : ''}>−</button><b>${T.min}</b><button type="button" class="step" data-meas="min:1"${T.min >= 30 ? ' disabled' : ''}>+</button>` +
         `<span class="dash">–</span>` +
-        `<button type="button" class="step" data-meas="max:-1">−</button><b>${T.max}</b><button type="button" class="step" data-meas="max:1">+</button></div>`;
+        `<button type="button" class="step" data-meas="max:-1"${T.max <= 1 ? ' disabled' : ''}>−</button><b>${T.max}</b><button type="button" class="step" data-meas="max:1"${T.max >= 30 ? ' disabled' : ''}>+</button></div>`;
       bindPages();
       this.el.rerollMenu.querySelectorAll('[data-sig]').forEach((b) => b.addEventListener('click', (e) => {
         const k = b.dataset.sig, on = T.sigs.includes(k);
@@ -283,11 +299,15 @@ export class LearnUI {
     this.kind = kind;
     const tonal = this.tonality === 'tonal';
     const T = this.tempo;
-    const measures = kind === 'book' && !tonal ? 12 : T.min + rnd(T.max - T.min + 1);
-    const opts = { voice: this.h.getVoice(), measures, rhythm: this.rhythm, tempo: T };
+    const book = kind === 'book' && !tonal;
+    const measures = book ? 12 : T.min + rnd(T.max - T.min + 1);
+    const lines = this.lang !== 'none' ? lyricLines(this.lang, 16) : [];
+    const rh = lines.length ? generateTextRhythm(this.rhythm, T, lines, book ? 12 : T.min, book ? 12 : T.max) : null;
+    const opts = { voice: this.h.getVoice(), measures, rhythm: this.rhythm, tempo: T, rh };
     this.phrase = tonal
       ? generateTonalPhrase({ style: this.style, ...opts })
       : generatePhrase({ intervals: this.intervals, ...opts });
+    this.phrase.lang = rh ? this.lang : null;
     this.reset();
   }
 
@@ -563,8 +583,18 @@ export class LearnUI {
     const { w, h } = this.surf;
     const P = this.phrase, notes = P.notes, shown = this.accidentals();
     const sigN = Math.abs(P.sig || 0);
+    const zh = P.lang === 'zhS' || P.lang === 'zhT';
+    const lyricFont = (gap) => zh ? `500 ${gap * 1.5}px "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif` : `500 ${gap * 1.2}px Inter, system-ui, sans-serif`;
+    const subFont = (gap) => `400 ${gap * 0.95}px Inter, system-ui, sans-serif`;
+    const lctx = this.surf.ctx;
+    const sylW = (n, gap) => {
+      if (!n.syl) return 0;
+      lctx.font = lyricFont(gap); let wd = lctx.measureText(n.syl.text).width;
+      if (n.syl.sub) { lctx.font = subFont(gap); wd = Math.max(wd, lctx.measureText(n.syl.sub).width); }
+      return wd + (n.syl.wordEnd ? 0 : gap * 0.9); // room for a hyphen
+    };
     const place = (gap) => {
-      let x = 0;
+      let x = 0, lyricRight = -Infinity;
       const heads = [], measStart = [], bars = [], sigs = [], xs = [];
       let ni = 0;
       P.measures.forEach((mz, m) => {
@@ -578,6 +608,11 @@ export class LearnUI {
         for (const it of ps) {
           const acc = it.k === 0 && shown[it.i] != null;
           if (acc) x += gap * 1.0;
+          if (it.k === 0 && it.n.syl) { // keep words from touching: move the note right if its syllable needs room
+            const wd = sylW(it.n, gap), want = lyricRight + wd / 2 + gap * 0.35;
+            if (x + gap * 0.6 < want) x = want - gap * 0.6;
+            lyricRight = x + gap * 0.6 + wd / 2;
+          }
           heads.push({ ...it, x: x + gap * 0.6 });
           if (it.k === 0) xs[it.i] = x + gap * 0.6;
           x += gap * (1.25 + 1.45 * Math.sqrt(it.pc.dur)) + (it.pc.type.dots ? gap * 0.5 : 0);
@@ -606,10 +641,14 @@ export class LearnUI {
       Lp.sigs.forEach((sg) => { sg.x = sc(sg.x); });
       Lp.contentW = avail;
     }
-    const top = h / 2 - 2 * gap; // top staff line
+    const words = !!P.lang;
+    const top = h / 2 - 2 * gap - (words ? gap * (zh ? 2.4 : 1.8) : 0); // top staff line (raised to make room for words)
     const bottomD = P.clef === 'treble' ? 30 : 18; // E4 / G2 = bottom line (diatonic number)
     const yOf = (n) => top + 4 * gap - ((n.oct * 7 + LETTERS.indexOf(n.letter)) - bottomD) * gap / 2;
     this.maxScroll = Math.max(0, Lp.contentW - avail);
+    const lowest = Math.max(top + 4 * gap, ...notes.map((n) => yOf(n)));
+    const lyricY = Math.max(top + 6.9 * gap, lowest + 2.4 * gap);
+    Object.assign(Lp, { lyricY, lyricFont: lyricFont(gap), subFont: subFont(gap) });
     const measOf = notes.map((n) => n.m);
     return { ...Lp, gap, top, yOf, x0, x1, avail, shown, measOf, sigN };
   }
@@ -734,9 +773,9 @@ export class LearnUI {
     const flagged = (hd) => hd.pc.type.base === '8' || hd.pc.type.base === '16';
     // beam groups: flagged notes within one beat (a triplet is always one group)
     const meterBounds = (mi) => {
-      const M = METERS[this.phrase.measures[mi].meter], b = [0];
+      const mz = this.phrase.measures[mi], M = METERS[mz.meter], b = [0];
       M.beats.forEach((v) => b.push(b[b.length - 1] + v));
-      return b.map((v) => v + this.phrase.measures[mi].start);
+      return b.map((v) => v + mz.start - (mz.offset || 0));
     };
     const groups = [];
     let cur = null;
@@ -846,6 +885,24 @@ export class LearnUI {
       ctx.fillStyle = '#12151c'; ctx.fillRect((a.sx + z.sx) / 2 - gap * 0.6, y - gap * 0.6, gap * 1.2, gap * 1.2);
       ctx.fillStyle = C.text; ctx.font = `italic 700 ${gap * 1.25}px "Noto Serif", Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('3', (a.sx + z.sx) / 2, y);
+    }
+    // words: one syllable under each note, hyphens within words, pinyin under Chinese characters
+    if (this.phrase.lang) {
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const firsts = L.heads.filter((hd) => hd.k === 0 && hd.n.syl);
+      firsts.forEach((hd, j) => {
+        if (!hd.vis) return;
+        const sy = hd.n.syl, done = hd.i < this.idx || this.done;
+        ctx.fillStyle = done ? C.muted : C.text;
+        ctx.font = L.lyricFont; ctx.fillText(sy.text, hd.sx, L.lyricY);
+        if (sy.sub) { ctx.font = L.subFont; ctx.fillStyle = C.muted; ctx.fillText(sy.sub, hd.sx, L.lyricY + gap * 1.45); }
+        const nx = firsts[j + 1];
+        if (!sy.wordEnd && nx?.vis) {
+          ctx.font = L.lyricFont;
+          const a = hd.sx + ctx.measureText(sy.text).width / 2, b = nx.sx - ctx.measureText(nx.n.syl.text).width / 2;
+          if (b - a > gap * 0.5) { ctx.fillStyle = C.muted; ctx.fillText('-', (a + b) / 2, L.lyricY); }
+        }
+      });
     }
     // ties: a curve from each piece to the next piece of the same note, away from the stems
     for (const n of notes) {

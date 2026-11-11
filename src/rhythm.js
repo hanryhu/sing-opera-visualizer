@@ -13,10 +13,16 @@ export const METERS = {
   '9/8': { num: 9, den: 8, beats: [1.5, 1.5, 1.5], strong: [0], compound: true },
   '12/8': { num: 12, den: 8, beats: [1.5, 1.5, 1.5, 1.5], strong: [0, 2], compound: true },
   '7/8': { num: 7, den: 8, beats: [1, 1, 1.5], strong: [0] },
+  '7/4': { num: 7, den: 4, beats: [1, 1, 1, 1, 1, 1, 1], strong: [0, 4] },
+  '5/8': { num: 5, den: 8, beats: [1, 1.5], strong: [0] },
+  '3/2': { num: 3, den: 2, beats: [2, 2, 2], strong: [0] },
+  '6/4': { num: 6, den: 4, beats: [3, 3], strong: [0, 1] },
+  '3/8': { num: 3, den: 8, beats: [1.5], strong: [0], compound: true },
+  '11/8': { num: 11, den: 8, beats: [1, 1, 1, 1.5], strong: [0] },
 };
 /** Time signature choices in the menu; 'other' draws from the less common meters. */
 export const SIG_CHOICES = ['cut', '3/4', '4/4', '6/8', 'other'];
-const OTHER = ['2/4', '5/4', '9/8', '12/8', '7/8'];
+const OTHER = ['2/4', '5/4', '7/4', '5/8', '7/8', '3/2', '6/4', '3/8', '9/8', '11/8', '12/8'];
 export const NOTE_VALUES = ['16', '8', 'q', 'h', 'w'];
 const BASE = { 16: 0.25, 8: 0.5, q: 1, h: 2, w: 4 };
 
@@ -61,10 +67,14 @@ function patterns(meter, from, to, k, D, triplets) {
   const nextBeat = (x) => bounds.find((b) => b > x + EPS) ?? bounds[bounds.length - 1];
   const half = meter.strong.length > 1 ? bounds[meter.strong[1]] : null;
   const res = [];
+  const minD = Math.min(...D, triplets ? 1 / 3 : Infinity), maxD = Math.max(...D);
+  let calls = 0;
   const rec = (pos, left, acc) => {
-    if (res.length > 300) return;
+    if (res.length > 300 || ++calls > 20000) return; // enough choices; bounded work
     if (eq(pos, to)) { if (left === 0) res.push(acc); return; }
     if (left === 0 || pos > to + EPS) return;
+    const room = to - pos; // prune: the notes left must be able to fill exactly the room left
+    if (room < left * minD - EPS || room > left * maxD + EPS) return;
     // triplet group on a simple beat (quarter, or half in cut time)
     const beatLen = nextBeat(pos) - pos;
     if (triplets && onBeat(pos) && !meter.compound && (eq(beatLen, 1) || eq(beatLen, 2)) && pos + beatLen <= to + EPS) {
@@ -193,5 +203,211 @@ export function generateRhythm(R, T, count) {
     }
     events.push({ start: n.start, dur: n.dur, pieces: [piece], strong: n.strong, m: n.m });
   }
+  return { measures, events };
+}
+
+/* ---------------- rhythm from text ---------------- */
+/** Split a duration starting at `pos` into writable pieces (tied), breaking at beats where needed. */
+function writable(pos, dur, beatsAbs) {
+  const out = [];
+  const VALUES = [4, 3, 2, 1.5, 1, 0.75, 0.5, 0.25];
+  let guard = 0;
+  while (dur > EPS && guard++ < 40) {
+    const onBeat = beatsAbs.some((b) => eq(b, pos));
+    const nextB = beatsAbs.find((b) => b > pos + EPS) ?? pos + dur;
+    let v = VALUES.find((x) => x <= dur + EPS && (onBeat ? beatsAbs.some((b) => eq(b, pos + x)) || eq(x, dur) : pos + x <= nextB + EPS)) ?? dur;
+    out.push({ start: pos, dur: v });
+    pos += v; dur -= v;
+  }
+  return out;
+}
+
+/**
+ * Rhythm fitted to verse. Each stressed syllable starts a foot on a beat, preferring strong beats; the
+ * unstressed syllables after it share the foot. Unstressed syllables before a line's first stress are an
+ * upbeat: they end just before a strong beat (the previous line's last note is held to make room), and at
+ * the very start they form a pickup bar. Lines end on longer notes.
+ * @param lines [{sylls:[{text, stress, wordEnd}]}]
+ * @returns same shape as generateRhythm, events carry .syl
+ */
+export function generateTextRhythm(R, T, lines, minBars, maxBars) {
+  const target = minBars + rnd(maxBars - minBars + 1);
+  const plan = meterPlan(T, maxBars + 12);
+  const measures = [], notes = [];
+  let mi = -1, bi = 0, t0 = 0, meter = null, bounds = null, D = null;
+  const ALL = [4, 3, 2, 1.5, 1, 0.75, 0.5, 0.25];
+  const newBar = () => {
+    if (meter) t0 += bounds[bounds.length - 1] - (measures[measures.length - 1].offset || 0);
+    mi += 1;
+    const sig = plan[Math.min(mi, plan.length - 1)];
+    meter = METERS[sig];
+    bounds = [0]; meter.beats.forEach((b) => bounds.push(bounds[bounds.length - 1] + b));
+    D = allowedDurations(R, meter);
+    const prev = measures[measures.length - 1];
+    measures.push({ start: t0, len: bounds[bounds.length - 1], meter: sig, showSig: !prev || prev.meter !== sig });
+    bi = 0;
+  };
+  const nb = () => meter.beats.length;
+  const isStrongIdx = (b) => b === nb() || meter.strong.includes(b);
+  const emit = (pattern, sylls, fromBeat) => {
+    let pos = t0 + bounds[fromBeat] - (measures[measures.length - 1].offset || 0);
+    pattern.forEach((n, i) => {
+      const inBar = bounds[fromBeat] + pattern.slice(0, i).reduce((a, x) => a + x.d, 0);
+      const strong = eq(inBar, 0) || meter.strong.some((b) => eq(bounds[b], inBar));
+      notes.push({ start: pos, dur: n.d, tup: n.tup ? `${mi}${n.tup}` : null, m: measures.length - 1, strong: strong && sylls[i].stress, syl: sylls[i] });
+      pos += n.d;
+    });
+  };
+  // Place k syllables from beat bi: choose a span; returns how many were placed
+  const placeFoot = (sylls, lineEnd) => {
+    let left = sylls, guard = 0;
+    while (left.length && guard++ < 40) {
+      if (bi >= nb()) newBar();
+      const k = left.length, opts = [];
+      // your note values first; if nothing fits, any value (better than dropping words)
+      for (const DD of [D, ALL]) {
+        for (let s = 1; bi + s <= nb(); s++) {
+          const pats = patterns(meter, bounds[bi], bounds[bi + s], k, DD, R.triplets && !lineEnd); // a line ends off a triplet
+          if (!pats.length) continue;
+          let w = isStrongIdx(bi + s) ? 3 : 1;
+          if (lineEnd) w *= 1 + s; else if (s > 2) w *= 0.4;
+          opts.push({ s, pats, w });
+        }
+        if (opts.length) break;
+      }
+      if (opts.length) {
+        let r = Math.random() * opts.reduce((a, o) => a + o.w, 0), o = opts[0];
+        for (const x of opts) { r -= x.w; if (r <= 0) { o = x; break; } }
+        emit(choosePattern(o.pats, lineEnd), left, bi);
+        bi += o.s; left = [];
+        break;
+      }
+      // doesn't fit in this bar: put as many as fit, carry the rest over
+      let placed = false;
+      for (let kk = k - 1; kk >= 1 && !placed; kk--) {
+        for (const DD of [D, ALL]) {
+          const pats = patterns(meter, bounds[bi], bounds[nb()], kk, DD, R.triplets);
+          if (pats.length) { emit(choosePattern(pats), left.slice(0, kk), bi); left = left.slice(kk); bi = nb(); placed = true; break; }
+        }
+      }
+      if (!placed) {
+        const pats = patterns(meter, bounds[bi], bounds[nb()], k, ALL, false);
+        if (pats.length) { emit(choosePattern(pats), left, bi); left = []; bi = nb(); }
+        else { // last resort: hold the previous note to the barline
+          const last = notes[notes.length - 1];
+          if (last) { last.dur += bounds[nb()] - bounds[bi]; last.tup = null; }
+          bi = nb();
+        }
+      }
+    }
+  };
+  // Hold the last note so an upbeat of k syllables ends right before a strong beat
+  const makeRoomForUpbeat = (k) => {
+    const last = notes[notes.length - 1];
+    for (let ext = 0; bi + ext < nb(); ext++) {
+      for (let s = 1; bi + ext + s <= nb(); s++) {
+        if (!isStrongIdx(bi + ext + s)) continue;
+        if (!patterns(meter, bounds[bi + ext], bounds[bi + ext + s], k, D, R.triplets).length) continue;
+        if (ext && last) {
+          if (last.tup || (bi === 0 && !R.ties)) continue; // never stretch a triplet; cross a barline only with ties
+          const nd = last.dur + bounds[bi + ext] - bounds[bi];
+          if (!noteType(nd) && !R.ties) continue;
+          last.dur = nd;
+        }
+        bi += ext;
+        return true;
+      }
+    }
+    return false;
+  };
+
+  let first = true;
+  // rough length of a line in bars (about one beat per syllable, plus a held ending)
+  const estBars = (n) => (n * 0.9 + 1.5) / METERS[plan[Math.max(0, mi)]].beats.length;
+  for (const line of lines) {
+    let sy = line.sylls;
+    const barsSoFar = measures.filter((m) => !m.pickup).length;
+    if (!first && barsSoFar >= minBars && barsSoFar + estBars(sy.length) > maxBars + 0.5) break; // the next line won't fit
+    if (first && estBars(sy.length) > maxBars + 0.5) { // even one line is too long: end it at a word boundary
+      const keep = Math.max(1, Math.floor((maxBars * METERS[plan[0]].beats.length - 1.5) / 0.9));
+      let cut = sy.slice(0, keep).map((x, i) => (x.wordEnd ? i : -1)).filter((i) => i >= 0).pop();
+      sy = sy.slice(0, (cut ?? keep - 1) + 1);
+    }
+    let a = sy.findIndex((s) => s.stress);
+    if (a < 0) a = 0;
+    const upbeat = sy.slice(0, a);
+    if (first) {
+      newBar();
+      if (upbeat.length) { // pickup bar: the last beat(s) of the first meter
+        let done = false;
+        for (let s = 1; s <= nb() && !done; s++) {
+          const pats = patterns(meter, bounds[nb() - s], bounds[nb()], upbeat.length, D, R.triplets);
+          if (!pats.length) continue;
+          const m0 = measures[0];
+          m0.offset = bounds[nb() - s]; m0.len = bounds[nb()] - m0.offset; m0.pickup = true;
+          emit(choosePattern(pats), upbeat, nb() - s);
+          bi = nb(); done = true;
+        }
+        if (!done) placeFoot(upbeat, false);
+      }
+      first = false;
+    } else if (upbeat.length) {
+      if (bi >= nb()) newBar();
+      makeRoomForUpbeat(upbeat.length); // if there's no clean way, the upbeat simply starts where we are
+      placeFoot(upbeat, false);
+    }
+    // feet: a stressed syllable and the unstressed ones after it
+    const feet = [];
+    for (let i = a; i < sy.length; i++) {
+      if (sy[i].stress || !feet.length) feet.push([sy[i]]); else feet[feet.length - 1].push(sy[i]);
+    }
+    feet.forEach((f, k) => {
+      if (bi >= nb()) newBar();
+      // a stressed syllable on a weak beat: hold the previous note to the next strong beat when that is clean
+      if (k > 0 && !isStrongIdx(bi) && bi > 0 && Math.random() < 0.5) {
+        const last = notes[notes.length - 1], nextS = [...meter.strong, nb()].filter((b) => b > bi).sort((x, y) => x - y)[0];
+        if (last && !last.tup && nextS != null && nextS < nb()) {
+          const nd = last.dur + bounds[nextS] - bounds[bi];
+          if (noteType(nd)) { last.dur = nd; bi = nextS; }
+        }
+      }
+      placeFoot(f, k === feet.length - 1);
+    });
+    const bars = measures.filter((m) => !m.pickup).length;
+    if (bars >= target) break;
+    if (bars >= maxBars) break;
+  }
+  // End: hold the last note to the barline
+  if (bi < nb()) { const last = notes[notes.length - 1]; if (last) { last.dur += bounds[nb()] - bounds[bi]; last.tup = null; } }
+
+  // Notes → events with writable pieces (long or barline-crossing notes become tied pieces)
+  const barAt = (tAbs) => {
+    let k = measures.length - 1;
+    while (k > 0 && measures[k].start > tAbs + EPS) k--;
+    return k;
+  };
+  const beatsAbs = [];
+  measures.forEach((mz) => {
+    const M = METERS[mz.meter];
+    let b = mz.start - (mz.offset || 0);
+    for (const len of [0, ...M.beats]) { b += len; if (b >= mz.start - EPS && b <= mz.start + mz.len + EPS) beatsAbs.push(b); }
+  });
+  beatsAbs.push(...measures.map((mz) => mz.start), (measures[measures.length - 1]?.start ?? 0) + (measures[measures.length - 1]?.len ?? 0));
+  beatsAbs.sort((x, y) => x - y);
+  const events = notes.map((n) => {
+    // split at barlines, then into writable values
+    const pieces = [];
+    let pos = n.start, left = n.dur, guard = 0;
+    while (left > EPS && guard++ < 40) {
+      const m = barAt(pos), end = measures[m].start + measures[m].len;
+      let seg = Math.min(left, end - pos);
+      if (seg <= EPS) seg = left; // past the last barline (shouldn't happen): keep the rest in this bar
+      const type = noteType(seg);
+      if (type) pieces.push({ start: pos, dur: seg, type, tup: n.tup, m });
+      else for (const p of writable(pos, seg, beatsAbs)) pieces.push({ ...p, type: noteType(p.dur) || noteType(0.25), tup: null, m });
+      pos += seg; left -= seg;
+    }
+    return { start: n.start, dur: n.dur, pieces, strong: n.strong, m: pieces[0].m, syl: n.syl };
+  });
   return { measures, events };
 }

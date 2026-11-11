@@ -40,6 +40,10 @@ export const SOURCES = [
     use: 'Learn: the interval material of each chapter (phrases are generated, not copied from the book).',
   },
   {
+    cite: 'Lyrics: public-domain verse by Giordani, Da Ponte, Piave, Rossi, Romani, Cottrau, Paisiello; Müller, Heine, Goethe, Schiller; Verlaine, Ronsard, Florian; Shakespeare, Jonson, Burns, Blake, Tennyson; Pushkin, Lermontov, Tyutchev; Li Bai, Meng Haoran, Wang Zhihuan, Wang Wei; and traditional songs.',
+    use: 'Learn: words under the notes, split into syllables with the stresses marked.',
+  },
+  {
     cite: 'Ferrero, F. E., Magno Caldognetto, E., Vagges, K. & Lavagnoli, C. (1978). Some acoustic characteristics of the Italian vowels. Journal of Italian Linguistics, 3, 87–96.',
     use: 'Low-voice landmarks (Standard Italian F1/F2 means).',
   },

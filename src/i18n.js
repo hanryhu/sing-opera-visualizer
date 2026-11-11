@@ -14,7 +14,7 @@ const ZH = {
   'Rhythm': '节奏', 'Tempo': '拍子', 'Previous': '上一页', 'Next': '下一页',
   'Sixteenth': '十六分音符', 'Eighth': '八分音符', 'Quarter': '四分音符', 'Half': '二分音符', 'Whole': '全音符',
   'Dotted': '附点', 'Triplets': '三连音', 'Ties': '连音线', 'Other': '其他', 'Cut time': '二二拍',
-  'Time signature changes': '变换拍号', 'Bars': '小节',
+  'Time signature changes': '变换拍号', 'Bars': '小节', 'Language': '歌词', 'No words': '无歌词',
   'Atonal': '无调性', 'Tonal': '调性', 'Pentatonic': '五声音阶', 'Diatonic': '自然音阶', 'Blues': '布鲁斯', 'Chromatic': '半音化', 'Modern': '现代',
   'Analyze your voice from the microphone': '通过麦克风分析你的声音',
   'Hear a synthesized voice with your own F0, F1, F2, F3 and volume': '用你设定的 F0、F1、F2、F3 和音量播放合成人声',
