@@ -136,7 +136,41 @@ dragControl(document.getElementById('metercanvas'), (x, y, w, h) => ({ db: meter
 
 let samplesUI = null;
 // Learn: sight-singing (takes Synthesize's place in the source switch; Synthesize code is kept)
-const learn = new LearnUI({ getVoice: () => voice, getCtx: () => session?.ctx || null, getTap: () => session?.tap || null, mute: MUTE_DEMO });
+// iPhone / iPad: while a page holds the microphone, iOS plays everything through the call channel (often the
+// earpiece, at call volume). For Learn's playback we let go of the mic so sound goes to the speaker as media,
+// then take it back afterwards.
+const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function setAudioSession(type) { try { if (navigator.audioSession) navigator.audioSession.type = type; } catch { /* unsupported */ } }
+let micBack = null;
+function releaseMic() {
+  clearTimeout(micBack);
+  if (!IOS || !session?.stream || session.mode !== 'mic') return;
+  session.stream.getTracks().forEach((tr) => tr.stop());
+  try { session.micSrc?.disconnect(); } catch { /* gone */ }
+  session.stream = null; session.micSrc = null;
+  setAudioSession('playback');
+  session.ctx.resume().catch(() => {});
+}
+function reopenMic(delayMs = 0) {
+  clearTimeout(micBack);
+  micBack = setTimeout(async () => {
+    const me = session;
+    if (!IOS || !me || me.mode !== 'mic' || me.stream || learn.playing) return;
+    try {
+      setAudioSession('play-and-record');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 },
+      });
+      if (session !== me || me.stream) { stream.getTracks().forEach((tr) => tr.stop()); return; }
+      me.stream = stream; me.micSrc = me.ctx.createMediaStreamSource(stream); me.micSrc.connect(me.tap);
+      me.ctx.resume().catch(() => {});
+    } catch (err) { showError(err); }
+  }, delayMs);
+}
+const learn = new LearnUI({
+  getVoice: () => voice, getCtx: () => session?.ctx || null, getTap: () => session?.tap || null, mute: MUTE_DEMO,
+  releaseMic, reopenMic,
+});
 window.__learn = learn; // dev/QA hook
 loadSamples().then((list) => {
   samplesUI = new SamplesUI(list, {
@@ -243,7 +277,9 @@ async function start(mode, sample) {
       });
       if (cancelled()) { stream.getTracks().forEach((t) => t.stop()); return; }
       session.stream = stream;
-      ctx.createMediaStreamSource(stream).connect(tap);
+      session.micSrc = ctx.createMediaStreamSource(stream);
+      session.micSrc.connect(tap);
+      setAudioSession('play-and-record');
     } else {
       startDemoSource();
     }

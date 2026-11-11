@@ -456,6 +456,7 @@ export class LearnUI {
   }
 
   startPlaying(p) {
+    this.h.releaseMic?.(); // iOS: speaker, not the call channel
     this.playing = p;
     this.el.play.setAttribute('aria-pressed', 'true');
     this.el.play.title = t('Stop');
@@ -473,6 +474,7 @@ export class LearnUI {
     this.playing = null;
     clearTimeout(this.playTimer);
     this.quietUntil = performance.now() / 1000 + 0.4; // let the room go quiet before listening again
+    this.h.reopenMic?.(150);
     this.el.play.setAttribute('aria-pressed', 'false');
     this.el.play.title = t('Play the melody');
     if (!take) this.reset(); // a performance replay keeps its colours
@@ -608,8 +610,10 @@ export class LearnUI {
   /** Tap a note: hear its pitch. Listening pauses while it sounds. */
   playStartPitch(i = 0) {
     const ctx = this.audioCtx();
+    this.h.releaseMic?.();
     this.tones(ctx, [{ midi: this.phrase.notes[i].midi, t: ctx.currentTime + 0.03, d: 1 }], 0.25);
     this.quietUntil = performance.now() / 1000 + 1.3;
+    this.h.reopenMic?.(1100);
   }
 
   /** Help: play the note the singer should be on, then the next one. Listening pauses meanwhile. */
@@ -622,6 +626,8 @@ export class LearnUI {
     this.hints = (this.hints || 0) + 1;
     this.wrongSince = null; this.offSince = null;
     this.quietUntil = now + 0.05 + list.length * HINT_NOTE + 0.3;
+    this.h.releaseMic?.();
+    this.h.reopenMic?.((0.05 + list.length * HINT_NOTE + 0.1) * 1000);
   }
 
   /* ---------------- performance: record one take, then play it back with the right notes ---------------- */
