@@ -25,6 +25,8 @@ const ADVANCE = 45;       // ± cents from the next note before the bar moves on
 const SWITCH_HOLD = 0.08; // s on the next note before the bar moves to it
 const ONSET_SKIP = 0.1;   // s of each note ignored for rating (the scoop into the note)
 const BPM = 72;
+const HINT_NOTE = 0.55;   // s per note when Help plays the right note and the next
+const ONSET_LAG = 0.08;   // s the follower detects a note after it is sung (analysis window + hold)
 
 const SHARP = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 const FLAT = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
@@ -81,18 +83,31 @@ export class LearnUI {
     this.el = {
       panel: $('learnPanel'), canvas: $('learnCanvas'), retry: $('learnRetry'), reroll: $('learnReroll'),
       rerollMenuBtn: $('learnRerollMenu'), rerollMenu: $('learnIntervals'), play: $('learnPlay'),
-      bookBtn: $('learnBook'), bookMenu: $('learnBookMenu'), score: $('learnScore'),
+      score: $('learnScore'),
+      help: $('learnHelp'), perf: $('learnPerf'),
     };
     this.surf = new Surface(this.el.canvas);
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem('va.learn.intervals') || 'null'); } catch { /* ignore */ }
     this.intervals = Array.isArray(saved) && saved.length ? saved : [...BOOK[0].intervals];
+    // What the dice makes: 'random' (short, the chosen intervals) or 'book' (book-length, a chapter's intervals)
+    try { this.kind = localStorage.getItem('va.learn.kind') === 'book' ? 'book' : 'random'; } catch { this.kind = 'random'; }
     this.phrase = null;
     this.playing = null;
     this.barX = null;
 
     this.el.retry.addEventListener('click', () => { this.stopPlayback(); this.reset(); });
-    this.el.reroll.addEventListener('click', () => this.reroll('random'));
+    // Help (toggle): when the singer goes wrong, play the right note and the next one
+    try { this.helpOn = localStorage.getItem('va.learn.help') === '1'; } catch { this.helpOn = false; }
+    this.el.help.setAttribute('aria-pressed', String(this.helpOn));
+    this.el.help.addEventListener('click', () => {
+      this.helpOn = !this.helpOn;
+      this.el.help.setAttribute('aria-pressed', String(this.helpOn));
+      try { localStorage.setItem('va.learn.help', this.helpOn ? '1' : '0'); } catch { /* ignore */ }
+    });
+    // Performance (one take): press before singing; recording stops after the last note, then plays back
+    this.el.perf.addEventListener('click', () => (this.perf ? this.cancelPerformance() : this.armPerformance()));
+    this.el.reroll.addEventListener('click', () => this.reroll());
     // Long phrases scroll: wheel or drag freely; the view also turns a page as the singer nears the edge
     const cv = this.el.canvas, clamp = (v) => Math.max(0, Math.min(this.maxScroll || 0, v));
     cv.addEventListener('wheel', (e) => {
@@ -111,7 +126,7 @@ export class LearnUI {
     const end = () => { drag = null; };
     cv.addEventListener('pointerup', end);
     cv.addEventListener('pointercancel', end);
-    this.el.play.addEventListener('click', () => (this.playing ? this.stopPlayback() : this.play()));
+    this.el.play.addEventListener('click', () => (this.playing ? this.stopPlayback() : this.done && this.take ? this.playTake() : this.play()));
     const toggleMenu = (btn, menu) => (e) => {
       e.stopPropagation();
       const open = menu.hidden;
@@ -120,37 +135,49 @@ export class LearnUI {
       btn.setAttribute('aria-expanded', String(open));
     };
     this.el.rerollMenuBtn.addEventListener('click', toggleMenu(this.el.rerollMenuBtn, this.el.rerollMenu));
-    this.el.bookBtn.addEventListener('click', toggleMenu(this.el.bookBtn, this.el.bookMenu));
     document.addEventListener('click', (e) => { if (!e.target.closest('.learn-menu')) this.closeMenus(); });
     this.renderMenus();
     if (document.fonts?.load) document.fonts.load('32px "Noto Music"', '\u{1D11E}\u{1D122}♯♭♮').then(() => this.draw(performance.now() / 1000)).catch(() => {});
   }
 
   closeMenus() {
-    this.el.rerollMenu.hidden = true; this.el.bookMenu.hidden = true;
-    this.el.rerollMenuBtn.setAttribute('aria-expanded', 'false'); this.el.bookBtn.setAttribute('aria-expanded', 'false');
+    this.el.rerollMenu.hidden = true;
+    this.el.rerollMenuBtn.setAttribute('aria-expanded', 'false');
   }
 
+  /** The dice menu: interval chips (short phrases) and book chapters (book-length phrases). */
   renderMenus() {
-    this.el.rerollMenu.innerHTML = INTERVALS.map((i) =>
-      `<button type="button" class="iv-chip" data-iv="${i.id}" aria-pressed="${this.intervals.includes(i.id)}">${i.id}</button>`).join('');
+    const save = () => {
+      try { localStorage.setItem('va.learn.intervals', JSON.stringify(this.intervals)); localStorage.setItem('va.learn.kind', this.kind); } catch { /* ignore */ }
+    };
+    const book = this.kind === 'book' ? BOOK.find((b) => b.intervals.join() === this.intervals.join()) : null;
+    this.el.rerollMenu.innerHTML =
+      `<div class="iv-grid">${INTERVALS.map((i) =>
+        `<button type="button" class="iv-chip" data-iv="${i.id}" aria-pressed="${this.intervals.includes(i.id)}">${i.id}</button>`).join('')}</div>` +
+      `<div class="sm-sep"></div>` +
+      BOOK.map((b) => `<button type="button" class="sm-row book-row" data-book="${b.id}" aria-pressed="${book === b}">` +
+        `<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>` +
+        `<span>${t(b.title)}</span></button>`).join('');
+    // A chip: back to short phrases with your own intervals (takes effect on the next roll)
     this.el.rerollMenu.querySelectorAll('[data-iv]').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
       const id = b.dataset.iv, on = this.intervals.includes(id);
       if (on && this.intervals.length === 1) return; // keep at least one
       this.intervals = on ? this.intervals.filter((x) => x !== id) : [...this.intervals, id];
-      try { localStorage.setItem('va.learn.intervals', JSON.stringify(this.intervals)); } catch { /* ignore */ }
-      b.setAttribute('aria-pressed', String(!on));
+      this.kind = 'random';
+      save();
+      this.renderMenus();
+      this.el.rerollMenu.hidden = false;
     }));
-    this.el.bookMenu.innerHTML = BOOK.map((b) =>
-      `<button type="button" class="sm-row" data-book="${b.id}"><span>${t(b.title)}</span><small>${b.intervals.join(' ')}</small></button>`).join('');
-    this.el.bookMenu.querySelectorAll('[data-book]').forEach((btn) => btn.addEventListener('click', () => {
+    // A chapter: its intervals, book-length phrases; rolls one now
+    this.el.rerollMenu.querySelectorAll('[data-book]').forEach((btn) => btn.addEventListener('click', () => {
       const b = BOOK.find((x) => x.id === btn.dataset.book);
       this.intervals = [...b.intervals];
-      try { localStorage.setItem('va.learn.intervals', JSON.stringify(this.intervals)); } catch { /* ignore */ }
+      this.kind = 'book';
+      save();
       this.renderMenus();
       this.closeMenus();
-      this.reroll('book');
+      this.reroll();
     }));
   }
 
@@ -158,9 +185,10 @@ export class LearnUI {
   close() { this.stopPlayback(); this.closeMenus(); this.el.panel.hidden = true; }
   get isOpen() { return !this.el.panel.hidden; }
 
-  /** New phrase. 'random' (dice): short, fits the screen. 'book': book-length (about 12 bars), scrolls. */
+  /** New phrase. 'random': short, fits the screen. 'book': book-length (about 12 bars), scrolls. */
   reroll(kind = this.kind || 'random') {
     this.stopPlayback();
+    this.cancelPerformance();
     this.kind = kind;
     const measures = kind === 'book' ? 12 : (this.surf.w || innerWidth) < 600 ? 3 : 4;
     this.phrase = generatePhrase({ intervals: this.intervals, voice: this.h.getVoice(), measures });
@@ -172,8 +200,9 @@ export class LearnUI {
 
   reset() {
     this.idx = 0; this.started = false; this.done = false;
-    this.cents = []; this.ratings = []; this.live = null;
+    this.cents = []; this.ratings = []; this.live = null; this.take = null;
     this.noteT = 0; this.nextSince = null; this.silentSince = null;
+    this.wrongSince = null; this.offSince = null; this.hintedIdx = -1;
     this.barX = null;
     this.scroll = 0; this.scrollTarget = 0; this.turnM = 0;
     this.el.score.textContent = '';
@@ -216,20 +245,30 @@ export class LearnUI {
         if (now - this.nextSince >= SWITCH_HOLD) {
           this.finishNote();
           this.idx += 1; this.cents = []; this.noteT = this.nextSince; this.nextSince = null;
+          this.markOnset(now);
         }
       } else {
         this.nextSince = null;
         if (Math.abs(cur) < MATCH) {
-          if (!this.started) { this.started = true; this.noteT = now; }
+          if (!this.started) { this.started = true; this.noteT = now; this.markOnset(now); }
           if (now - this.noteT > ONSET_SKIP) this.cents.push(LearnUI.off(o.midiRaw || o.midiFast, notes[this.idx].midi));
           this.live = this.rate(this.cents.slice(-20));
         }
       }
+      // Help: a wrong note (neither this one nor the next) for 0.6 s, or this note held out of tune for 0.4 s
+      const wrong = Math.abs(cur) >= MATCH && Math.abs(nxt) >= MATCH;
+      this.wrongSince = wrong ? (this.wrongSince ?? now) : null;
+      const off = this.started && this.live && this.live.state !== 'in' && this.cents.length >= 12;
+      this.offSince = off ? (this.offSince ?? now) : null;
+      if (this.helpOn && !this.perf && this.hintedIdx !== this.idx // no hints during a performance take
+        && ((this.wrongSince && now - this.wrongSince > 0.6) || (this.offSince && now - this.offSince > 0.4))) this.hint(now);
     } else if (!quiet && this.started && !this.done) {
+      this.wrongSince = null; this.offSince = null;
       this.silentSince ??= now;
       // Last note: finished when the singer stops after holding it
       if (this.idx === notes.length - 1 && now - this.silentSince > 0.25 && this.cents.length >= 3) {
         this.finishNote(); this.done = true; this.showScore();
+        if (this.perf) this.finishPerformance();
       }
     }
     this.draw(now);
@@ -241,49 +280,156 @@ export class LearnUI {
   }
 
   /* ---------------- playback ---------------- */
-  play() {
+  audioCtx() {
     const ctx = this.h.getCtx() || (this.ownCtx ||= new (window.AudioContext || window.webkitAudioContext)());
     ctx.resume?.();
-    this.reset();
-    const spb = 60 / BPM, t0 = ctx.currentTime + 0.1;
+    return ctx;
+  }
+
+  /** Schedule simple voice-like tones [{midi, t, d}] into a new output; returns that output. */
+  tones(ctx, list, gain) {
     const out = ctx.createGain();
-    out.gain.value = this.h.mute ? 0 : 0.22;
+    out.gain.value = this.h.mute ? 0 : gain;
     out.connect(ctx.destination);
     const wave = ctx.createPeriodicWave(new Float32Array([0, 0, 0, 0, 0, 0]), new Float32Array([0, 1, 0.5, 0.33, 0.2, 0.12]));
-    let tt = t0;
-    const times = [];
-    for (const n of this.phrase.notes) {
+    for (const { midi, t: tt, d } of list) {
+      if (d < 0.06) continue;
       const osc = ctx.createOscillator(), g = ctx.createGain();
       osc.setPeriodicWave(wave);
-      osc.frequency.value = midiToFreq(n.midi);
-      const d = n.dur * spb;
+      osc.frequency.value = midiToFreq(midi);
       g.gain.setValueAtTime(0, tt);
       g.gain.linearRampToValueAtTime(1, tt + 0.03);
       g.gain.setValueAtTime(1, tt + d - 0.08);
       g.gain.linearRampToValueAtTime(0, tt + d - 0.02);
       osc.connect(g).connect(out);
       osc.start(tt); osc.stop(tt + d);
-      times.push(tt);
-      tt += d;
     }
-    this.playing = { ctx, out, times, end: tt };
+    return out;
+  }
+
+  play() {
+    const ctx = this.audioCtx();
+    this.cancelPerformance();
+    this.reset();
+    const spb = 60 / BPM;
+    let tt = ctx.currentTime + 0.1;
+    const list = this.phrase.notes.map((n) => { const e = { midi: n.midi, t: tt, d: n.dur * spb }; tt += e.d; return e; });
+    this.startPlaying({ ctx, out: this.tones(ctx, list, 0.22), times: list.map((e) => e.t), end: tt });
+  }
+
+  startPlaying(p) {
+    this.playing = p;
     this.el.play.setAttribute('aria-pressed', 'true');
     this.el.play.title = t('Stop');
     clearTimeout(this.playTimer);
-    this.playTimer = setTimeout(() => this.stopPlayback(), (tt - ctx.currentTime) * 1000 + 50);
+    this.playTimer = setTimeout(() => this.stopPlayback(), (p.end - p.ctx.currentTime) * 1000 + 50);
   }
 
   stopPlayback() {
     if (!this.playing) return;
-    const { ctx, out } = this.playing;
-    try { out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setValueAtTime(out.gain.value, ctx.currentTime); out.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.05); } catch { /* closed */ }
-    setTimeout(() => { try { out.disconnect(); } catch { /* noop */ } }, 120);
+    const { ctx, outs, take } = this.playing;
+    for (const out of outs || [this.playing.out]) {
+      try { out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setValueAtTime(out.gain.value, ctx.currentTime); out.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.05); } catch { /* closed */ }
+      setTimeout(() => { try { out.disconnect(); } catch { /* noop */ } }, 120);
+    }
     this.playing = null;
     clearTimeout(this.playTimer);
     this.quietUntil = performance.now() / 1000 + 0.4; // let the room go quiet before listening again
     this.el.play.setAttribute('aria-pressed', 'false');
     this.el.play.title = t('Play the melody');
+    if (!take) this.reset(); // a performance replay keeps its colours
+  }
+
+  /** Help: play the note the singer should be on, then the next one. Listening pauses meanwhile. */
+  hint(now) {
+    const ctx = this.audioCtx(), notes = this.phrase.notes;
+    const t0 = ctx.currentTime + 0.05;
+    const list = [notes[this.idx], notes[this.idx + 1]].filter(Boolean).map((n, k) => ({ midi: n.midi, t: t0 + k * HINT_NOTE, d: HINT_NOTE }));
+    this.tones(ctx, list, 0.25);
+    this.hintedIdx = this.idx;
+    this.hints = (this.hints || 0) + 1;
+    this.wrongSince = null; this.offSince = null;
+    this.quietUntil = now + 0.05 + list.length * HINT_NOTE + 0.3;
+  }
+
+  /* ---------------- performance: record one take, then play it back with the right notes ---------------- */
+  async armPerformance() {
+    this.stopPlayback();
     this.reset();
+    const ctx = this.h.getCtx(), tap = this.h.getTap?.();
+    if (!ctx || !tap) return;
+    this.perf = { chunks: [], onsets: [], t0: null, ctx };
+    this.el.perf.setAttribute('aria-pressed', 'true');
+    try {
+      if (this.recCtx !== ctx) {
+        await ctx.audioWorklet.addModule('src/rec-worklet.js');
+        this.recCtx = ctx;
+        this.recNode = new AudioWorkletNode(ctx, 'take-recorder');
+        const sink = ctx.createGain(); sink.gain.value = 0; // keeps the node running, silently
+        tap.connect(this.recNode); this.recNode.connect(sink).connect(ctx.destination);
+      }
+    } catch { this.cancelPerformance(); return; }
+    if (!this.perf) return;
+    this.perf.t0 = ctx.currentTime;
+    this.recNode.port.onmessage = (e) => {
+      const P = this.perf;
+      if (!P || P.stopped) return;
+      P.chunks.push(e.data);
+      if (P.chunks.length * 128 > ctx.sampleRate * 180) this.cancelPerformance(); // 3 min cap
+    };
+  }
+
+  cancelPerformance() {
+    if (this.recNode) this.recNode.port.onmessage = null;
+    this.perf = null;
+    this.el.perf.setAttribute('aria-pressed', 'false');
+  }
+
+  /** Note onset in recording time (the follower hears a note ~ONSET_LAG after it starts). */
+  markOnset(now) {
+    const P = this.perf;
+    if (!P || P.t0 == null) return;
+    const ago = now - this.noteT; // the switch is confirmed a little after the note began
+    P.onsets[this.idx] = Math.max(0, P.ctx.currentTime - P.t0 - ago - ONSET_LAG);
+  }
+
+  finishPerformance() {
+    const P = this.perf;
+    if (!P || P.t0 == null) return this.cancelPerformance();
+    P.stopped = true;
+    P.end = P.ctx.currentTime - P.t0;
+    this.cancelPerformance();
+    const n = P.chunks.reduce((a, c) => a + c.length, 0);
+    if (!n) return;
+    const buf = P.ctx.createBuffer(1, n, P.ctx.sampleRate), x = buf.getChannelData(0);
+    let o = 0;
+    for (const c of P.chunks) { x.set(c, o); o += c.length; }
+    this.take = { buf, onsets: P.onsets, end: P.end };
+    setTimeout(() => this.playTake(), 350);
+  }
+
+  /** Your take with the right notes underneath, each started where you started it. */
+  playTake() {
+    const T = this.take;
+    if (!T) return;
+    const ctx = this.audioCtx(), notes = this.phrase.notes;
+    const from = Math.max(0, (T.onsets.find((v) => v != null) ?? 0) - 0.4);
+    const t0 = ctx.currentTime + 0.1, end = t0 + T.end - from;
+    const voice = ctx.createGain();
+    voice.gain.value = this.h.mute ? 0 : 1;
+    voice.connect(ctx.destination);
+    const src = ctx.createBufferSource();
+    src.buffer = T.buf;
+    src.connect(voice);
+    src.start(t0, from);
+    const list = [];
+    notes.forEach((nt, i) => {
+      if (T.onsets[i] == null) return;
+      const next = T.onsets.slice(i + 1).find((v) => v != null) ?? T.end;
+      list.push({ midi: nt.midi, t: t0 + T.onsets[i] - from, d: next - T.onsets[i] - 0.03 });
+    });
+    const synth = this.tones(ctx, list, 0.1);
+    this.startPlaying({ ctx, outs: [voice, synth], times: list.map((e) => e.t), end, take: true });
   }
 
   /** Dev: a silent synthetic singer for this phrase (cents detune per note), as an AudioBuffer. */

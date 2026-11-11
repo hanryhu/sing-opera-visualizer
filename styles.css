@@ -120,13 +120,16 @@ body {
 .learn .fill { position: absolute; inset: 0; }
 #learnCanvas { touch-action: pan-y; } /* horizontal drags scroll the staff; vertical ones scroll the page */
 body.learn-on .f3, body.learn-on .vowels { display: none; }
+body:not(.learn-on) #learnHelp { display: none; } /* Pitch hints: a Learn setting */
 .learn-tools { position: absolute; top: 8px; right: 10px; z-index: 3; display: flex; align-items: center; gap: 6px; }
 .learn-score { font: 600 14px var(--ui); color: var(--green); font-variant-numeric: tabular-nums; margin-right: 4px; }
 .learn-menu { position: relative; display: flex; }
 .learn-menu.split > .icon-toggle { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .caret-btn { width: 20px; height: 32px; padding: 0; display: inline-grid; place-items: center; border-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
-.book-btn { height: 32px; padding: 0 6px 0 8px; display: inline-flex; align-items: center; gap: 3px; }
 .play-btn .stop-sq { display: none; }
+.perf-btn .rec-dot { display: none; }
+.perf-btn[aria-pressed="true"] { color: #fff; border-color: rgba(255, 77, 94, .6); background: rgba(255, 77, 94, .15); }
+.perf-btn[aria-pressed="true"] .rec-dot { display: inline; animation: pulse 1.6s infinite; }
 .play-btn[aria-pressed="true"] .play-tri { display: none; }
 .play-btn[aria-pressed="true"] .stop-sq { display: inline; }
 .learn-pop {
@@ -136,7 +139,11 @@ body.learn-on .f3, body.learn-on .vowels { display: none; }
 .learn-pop[hidden] { display: none; }
 .learn-pop .sm-row { white-space: nowrap; gap: 14px; }
 .learn-pop .sm-row small { color: var(--faint); }
-.iv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; min-width: 200px; }
+.iv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; min-width: 220px; }
+.book-row { display: flex; align-items: center; gap: 8px; width: 100%; }
+.book-row svg { color: var(--muted); flex: none; }
+.book-row[aria-pressed="true"] { color: var(--accent); }
+.book-row[aria-pressed="true"] svg { color: var(--accent); }
 .iv-chip { font: 600 14px var(--ui); padding: 7px 0; border-radius: 8px; cursor: pointer; background: var(--panel); color: var(--muted); border: 1px solid var(--line-strong); }
 .iv-chip[aria-pressed="true"] { color: var(--accent); border-color: rgba(124, 196, 255, .55); background: rgba(124, 196, 255, .1); }
 body[data-live="learn"] .mode-switch button[data-mode="learn"] .mic-ico { color: #fff; }

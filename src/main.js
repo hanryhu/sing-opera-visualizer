@@ -136,7 +136,7 @@ dragControl(document.getElementById('metercanvas'), (x, y, w, h) => ({ db: meter
 
 let samplesUI = null;
 // Learn: sight-singing (takes Synthesize's place in the source switch; Synthesize code is kept)
-const learn = new LearnUI({ getVoice: () => voice, getCtx: () => session?.ctx || null, mute: MUTE_DEMO });
+const learn = new LearnUI({ getVoice: () => voice, getCtx: () => session?.ctx || null, getTap: () => session?.tap || null, mute: MUTE_DEMO });
 window.__learn = learn; // dev/QA hook
 loadSamples().then((list) => {
   samplesUI = new SamplesUI(list, {
@@ -645,7 +645,7 @@ document.addEventListener('visibilitychange', () => {
 // Autostart from URL (see MUTE_DEMO above).
 if (PARAMS.has('devtest')) start('demo');
 else if (PARAMS.has('devsynth')) synth.open();
-else if (PARAMS.has('devlearn')) { if (PARAMS.has('book')) learn.reroll('book'); chooseSource('learn'); }
+else if (PARAMS.has('devlearn')) { if (PARAMS.has('book')) learn.reroll('book'); chooseSource('learn').then(() => { if (PARAMS.has('perf')) learn.armPerformance(); }); }
 
 /* ---------------- help ---------------- */
 const help = document.getElementById('helpDialog');
