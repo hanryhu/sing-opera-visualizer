@@ -26,8 +26,8 @@ const OTHER = ['2/4', '5/4', '7/4', '5/8', '7/8', '3/2', '6/4', '3/8', '9/8', '1
 export const NOTE_VALUES = ['16', '8', 'q', 'h', 'w'];
 const BASE = { 16: 0.25, 8: 0.5, q: 1, h: 2, w: 4 };
 
-export const DEFAULT_RHYTHM = { values: ['8', 'q', 'h', 'w'], dotted: true, triplets: false, ties: false };
-export const DEFAULT_TEMPO = { sigs: ['4/4'], changes: false, min: 3, max: 6 };
+export const DEFAULT_RHYTHM = { v: 2, values: ['8', 'q', 'h', 'w'], dotted: true, triplets: true, ties: false };
+export const DEFAULT_TEMPO = { v: 2, sigs: ['3/4', '4/4'], changes: false, min: 3, max: 10 };
 
 const rnd = (n) => Math.floor(Math.random() * n);
 const pick = (a) => a[rnd(a.length)];
@@ -263,42 +263,47 @@ export function generateTextRhythm(R, T, lines, minBars, maxBars) {
     let left = sylls, guard = 0;
     while (left.length && guard++ < 40) {
       if (bi >= nb()) newBar();
-      const k = left.length, opts = [];
-      // your note values first; if nothing fits, any value (better than dropping words)
-      for (const DD of [D, ALL]) {
+      const k = left.length;
+      // Place all k syllables over some span of beats from here, using the values in DD; else, with
+      // `partial`, as many as fit before the barline (the rest carry over). Returns true if anything was placed.
+      const tryPlace = (DD, partial, trip) => {
+        const opts = [];
         for (let s = 1; bi + s <= nb(); s++) {
-          const pats = patterns(meter, bounds[bi], bounds[bi + s], k, DD, R.triplets && !lineEnd); // a line ends off a triplet
+          const pats = patterns(meter, bounds[bi], bounds[bi + s], k, DD, trip && !lineEnd); // a line ends off a triplet
           if (!pats.length) continue;
           let w = isStrongIdx(bi + s) ? 3 : 1;
           if (lineEnd) w *= 1 + s; else if (s > 2) w *= 0.4;
           opts.push({ s, pats, w });
         }
-        if (opts.length) break;
-      }
-      if (opts.length) {
-        let r = Math.random() * opts.reduce((a, o) => a + o.w, 0), o = opts[0];
-        for (const x of opts) { r -= x.w; if (r <= 0) { o = x; break; } }
-        emit(choosePattern(o.pats, lineEnd), left, bi);
-        bi += o.s; left = [];
-        break;
-      }
-      // doesn't fit in this bar: put as many as fit, carry the rest over
-      let placed = false;
-      for (let kk = k - 1; kk >= 1 && !placed; kk--) {
-        for (const DD of [D, ALL]) {
-          const pats = patterns(meter, bounds[bi], bounds[nb()], kk, DD, R.triplets);
-          if (pats.length) { emit(choosePattern(pats), left.slice(0, kk), bi); left = left.slice(kk); bi = nb(); placed = true; break; }
+        if (opts.length) {
+          let r = Math.random() * opts.reduce((a, o) => a + o.w, 0), o = opts[0];
+          for (const x of opts) { r -= x.w; if (r <= 0) { o = x; break; } }
+          emit(choosePattern(o.pats, lineEnd), left, bi);
+          bi += o.s; left = [];
+          return true;
         }
-      }
-      if (!placed) {
-        const pats = patterns(meter, bounds[bi], bounds[nb()], k, ALL, false);
-        if (pats.length) { emit(choosePattern(pats), left, bi); left = []; bi = nb(); }
-        else { // last resort: hold the previous note to the barline
-          const last = notes[notes.length - 1];
-          if (last) { last.dur += bounds[nb()] - bounds[bi]; last.tup = null; }
-          bi = nb();
+        if (!partial) return false;
+        for (let kk = k - 1; kk >= 1; kk--) {
+          for (let s = nb() - bi; s >= 1; s--) {
+            const pats = patterns(meter, bounds[bi], bounds[bi + s], kk, DD, trip);
+            if (pats.length) { emit(choosePattern(pats), left.slice(0, kk), bi); left = left.slice(kk); bi += s; return true; }
+          }
         }
+        return false;
+      };
+      if (tryPlace(D, true, R.triplets)) continue;
+      // nothing fits from here: hold the previous note to the barline and start these words in the next bar
+      const prev = notes[notes.length - 1];
+      if (bi > 0 && prev && !prev.tup) { prev.dur += bounds[nb()] - bounds[bi]; bi = nb(); continue; }
+      // at the start of a bar and still nothing: values no shorter than your shortest, then any value
+      const shortest = Math.min(...D);
+      let ok = false;
+      for (const floor of [shortest, 1, 0.5, 0]) { // shortest of yours, then quarters, eighths, and only then sixteenths
+        if (tryPlace(ALL.filter((v) => v >= Math.min(floor, shortest) - EPS || v >= floor - EPS), true, false)) { ok = true; break; }
       }
+      if (ok) continue;
+      if (prev) { prev.dur += bounds[nb()] - bounds[bi]; prev.tup = null; }
+      bi = nb();
     }
   };
   // Hold the last note so an upbeat of k syllables ends right before a strong beat

@@ -102,7 +102,10 @@ export class LearnUI {
     try { this.tonality = localStorage.getItem('va.learn.tonality') === 'atonal' ? 'atonal' : 'tonal'; } catch { this.tonality = 'tonal'; }
     try { this.style = TONAL_STYLES.includes(localStorage.getItem('va.learn.style')) ? localStorage.getItem('va.learn.style') : 'pentatonic'; } catch { this.style = 'pentatonic'; }
     // Rhythm and Tempo settings (note values, dots, triplets, ties; time signatures, changes, bar count)
-    const load = (k, d) => { try { return { ...d, ...JSON.parse(localStorage.getItem(k) || '{}') }; } catch { return { ...d }; } };
+    // saved settings from an older version of the defaults are replaced by the current defaults
+    const load = (k, d) => {
+      try { const sv = JSON.parse(localStorage.getItem(k) || '{}'); return sv.v === d.v ? { ...d, ...sv } : { ...d }; } catch { return { ...d }; }
+    };
     this.rhythm = load('va.learn.rhythm', DEFAULT_RHYTHM);
     this.tempo = load('va.learn.tempo', DEFAULT_TEMPO);
     this.page = 0; // dice menu page: Pitch, Rhythm, Tempo, Language
