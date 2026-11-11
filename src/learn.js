@@ -105,8 +105,9 @@ export class LearnUI {
     // What the dice makes: 'random' (short, the chosen intervals) or 'book' (book-length, a chapter's intervals)
     try { this.kind = localStorage.getItem('va.learn.kind') === 'book' ? 'book' : 'random'; } catch { this.kind = 'random'; }
     // Atonal | Tonal, and the tonal style
-    try { this.tonality = localStorage.getItem('va.learn.tonality') === 'tonal' ? 'tonal' : 'atonal'; } catch { this.tonality = 'atonal'; }
-    try { this.style = TONAL_STYLES.includes(localStorage.getItem('va.learn.style')) ? localStorage.getItem('va.learn.style') : 'diatonic'; } catch { this.style = 'diatonic'; }
+    // First visit: tonal pentatonic, the easiest to sing
+    try { this.tonality = localStorage.getItem('va.learn.tonality') === 'atonal' ? 'atonal' : 'tonal'; } catch { this.tonality = 'tonal'; }
+    try { this.style = TONAL_STYLES.includes(localStorage.getItem('va.learn.style')) ? localStorage.getItem('va.learn.style') : 'pentatonic'; } catch { this.style = 'pentatonic'; }
     this.phrase = null;
     this.playing = null;
     this.barX = null;
