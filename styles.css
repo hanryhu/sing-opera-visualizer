@@ -146,6 +146,10 @@ body:not(.learn-on) #learnHelp { display: none; } /* Pitch hints: a Learn settin
 .learn-pop .sm-row { white-space: nowrap; gap: 14px; }
 .learn-pop .sm-row small { color: var(--faint); }
 .iv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; min-width: 220px; }
+.ton-seg { display: flex; width: 100%; margin-bottom: 8px; }
+.ton-seg button { flex: 1; }
+.style-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; min-width: 220px; }
+.style-grid .iv-chip { font-size: 13px; padding: 8px 6px; }
 .book-row { display: flex; align-items: center; gap: 8px; width: 100%; }
 .book-row svg { color: var(--muted); flex: none; }
 .book-row[aria-pressed="true"] { color: var(--accent); }

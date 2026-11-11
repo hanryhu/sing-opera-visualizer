@@ -5,7 +5,7 @@
 import { Surface, C } from './ui/panels.js';
 import { midiToFreq } from './dsp/pitch.js';
 import { t } from './i18n.js';
-import { spellLine, nextAtonal } from './melody.js';
+import { spellLine, nextAtonal, tonalLine, keySigMap, TONAL_STYLES } from './melody.js';
 
 /** Intervals offered for generation (semitones). */
 export const INTERVALS = [
@@ -33,20 +33,55 @@ const LETTERS = 'CDEFGAB';
 const rnd = (n) => Math.floor(Math.random() * n);
 const pick = (a) => a[rnd(a.length)];
 
-/** Random atonal phrase: measures of 4/4 in quarters and halves, ending on a long note. */
+/** Rhythm: measures of 4/4 in quarters and halves, ending on a long note. strong = starts on beat 1 or 3. */
+function rhythm(measures) {
+  const BODY = [[1, 1, 1, 1], [2, 1, 1], [1, 1, 2], [1, 2, 1], [1, 1, 1, 1]];
+  const END = [[1, 1, 2], [2, 2], [1, 1, 2]];
+  const durs = [];
+  for (let m = 0; m < measures; m++) {
+    let beat = 0;
+    for (const [i, d, a] of (m === measures - 1 ? pick(END) : pick(BODY)).map((d, i, a) => [i, d, a])) {
+      durs.push({ d, bar: i === a.length - 1, strong: beat === 0 || beat === 2 });
+      beat += d;
+    }
+  }
+  return durs;
+}
+
+/** Tonal phrase in a style (pentatonic, diatonic, blues, chromatic, modern), with a key signature. */
+export function generateTonalPhrase({ style, voice = 'low', measures = 4 }) {
+  const [lo, hi] = RANGE[voice] || RANGE.low;
+  const durs = rhythm(measures);
+  const line = tonalLine(style, durs.length, durs.map((d) => d.strong), lo, hi);
+  const notes = line.notes.map((n, i) => ({ midi: n.midi, dur: durs[i].d, barAfter: durs[i].bar && i < durs.length - 1, sp: n.spelled }));
+  const fallback = spellLine(notes);
+  notes.forEach((n, i) => { Object.assign(n, n.sp || fallback[i]); delete n.sp; });
+  return { notes, clef: voice === 'high' ? 'treble' : 'bass', sig: line.sig, scale: line.scaleId };
+}
+
+/** Random atonal phrase. */
 export function generatePhrase({ intervals, voice = 'low', measures = 4 }) {
   const [lo, hi] = RANGE[voice] || RANGE.low;
   const steps = INTERVALS.filter((i) => intervals.includes(i.id)).map((i) => i.st);
   if (!steps.length) steps.push(1, 2);
-  const BODY = [[1, 1, 1, 1], [2, 1, 1], [1, 1, 2], [1, 2, 1], [1, 1, 1, 1]];
-  const END = [[1, 1, 2], [2, 2], [1, 1, 2]];
-  const durs = [];
-  for (let m = 0; m < measures; m++) durs.push(...(m === measures - 1 ? pick(END) : pick(BODY)).map((d, i, a) => ({ d, bar: i === a.length - 1 })));
+  const durs = rhythm(measures);
   const mids = [Math.round((lo + hi) / 2 - 3 + rnd(7))];
   while (mids.length < durs.length) mids.push(nextAtonal(mids, steps, lo, hi));
   const notes = mids.map((midi, i) => ({ midi, dur: durs[i].d, barAfter: durs[i].bar && i < durs.length - 1 }));
   spellLine(notes).forEach((sp, i) => Object.assign(notes[i], sp));
   return { notes, clef: voice === 'high' ? 'treble' : 'bass' };
+}
+
+/**
+ * Draw ♯ ♭ ♮ placed by the glyph's measured ink (font metrics vary): a sharp or natural is centred on its
+ * line or space; a flat's bowl sits on it, so its ink bottom goes half a space below.
+ */
+function drawAcc(ctx, acc, x, y, gap, align) {
+  const g = acc === 1 ? '♯' : acc === -1 ? '♭' : '♮';
+  ctx.font = `${gap * 2.6}px "Noto Music"`; ctx.textAlign = align; ctx.textBaseline = 'alphabetic';
+  const m = ctx.measureText(g), up = m.actualBoundingBoxAscent, down = m.actualBoundingBoxDescent;
+  const base = acc === -1 ? y + gap * 0.55 - down : y + (up - down) / 2;
+  ctx.fillText(g, x, base);
 }
 
 /* ------------------------------------------------------------------ */
@@ -69,6 +104,9 @@ export class LearnUI {
     this.intervals = Array.isArray(saved) && saved.length ? saved : [...BOOK[0].intervals];
     // What the dice makes: 'random' (short, the chosen intervals) or 'book' (book-length, a chapter's intervals)
     try { this.kind = localStorage.getItem('va.learn.kind') === 'book' ? 'book' : 'random'; } catch { this.kind = 'random'; }
+    // Atonal | Tonal, and the tonal style
+    try { this.tonality = localStorage.getItem('va.learn.tonality') === 'tonal' ? 'tonal' : 'atonal'; } catch { this.tonality = 'atonal'; }
+    try { this.style = TONAL_STYLES.includes(localStorage.getItem('va.learn.style')) ? localStorage.getItem('va.learn.style') : 'diatonic'; } catch { this.style = 'diatonic'; }
     this.phrase = null;
     this.playing = null;
     this.barX = null;
@@ -132,16 +170,36 @@ export class LearnUI {
   /** The dice menu: interval chips (short phrases) and book chapters (book-length phrases). */
   renderMenus() {
     const save = () => {
-      try { localStorage.setItem('va.learn.intervals', JSON.stringify(this.intervals)); localStorage.setItem('va.learn.kind', this.kind); } catch { /* ignore */ }
+      try {
+        localStorage.setItem('va.learn.intervals', JSON.stringify(this.intervals)); localStorage.setItem('va.learn.kind', this.kind);
+        localStorage.setItem('va.learn.tonality', this.tonality); localStorage.setItem('va.learn.style', this.style);
+      } catch { /* ignore */ }
     };
-    const book = this.kind === 'book' ? BOOK.find((b) => b.intervals.join() === this.intervals.join()) : null;
-    this.el.rerollMenu.innerHTML =
+    const book = this.tonality === 'atonal' && this.kind === 'book' ? BOOK.find((b) => b.intervals.join() === this.intervals.join()) : null;
+    const STYLE_NAMES = { pentatonic: 'Pentatonic', diatonic: 'Diatonic', blues: 'Blues', chromatic: 'Chromatic', modern: 'Modern' };
+    const seg = `<div class="segmented ton-seg" role="radiogroup">` +
+      ['atonal', 'tonal'].map((k) => `<button type="button" role="radio" data-ton="${k}" aria-checked="${this.tonality === k}">${t(k === 'atonal' ? 'Atonal' : 'Tonal')}</button>`).join('') + `</div>`;
+    if (this.tonality === 'tonal') {
+      this.el.rerollMenu.innerHTML = seg + `<div class="style-grid">${TONAL_STYLES.map((k) =>
+        `<button type="button" class="iv-chip" data-style="${k}" aria-pressed="${this.style === k}">${t(STYLE_NAMES[k])}</button>`).join('')}</div>`;
+    } else this.el.rerollMenu.innerHTML = seg +
       `<div class="iv-grid">${INTERVALS.map((i) =>
         `<button type="button" class="iv-chip" data-iv="${i.id}" aria-pressed="${this.intervals.includes(i.id)}">${i.id}</button>`).join('')}</div>` +
       `<div class="sm-sep"></div>` +
       BOOK.map((b) => `<button type="button" class="sm-row book-row" data-book="${b.id}" aria-pressed="${book === b}">` +
         `<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>` +
         `<span>${t(b.title)}</span></button>`).join('');
+    this.el.rerollMenu.querySelectorAll('[data-ton]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.tonality = b.dataset.ton;
+      if (this.tonality === 'tonal') this.kind = 'random';
+      save(); this.renderMenus(); this.el.rerollMenu.hidden = false;
+    }));
+    this.el.rerollMenu.querySelectorAll('[data-style]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.style = b.dataset.style;
+      save(); this.renderMenus(); this.el.rerollMenu.hidden = false;
+    }));
     // A chip: back to short phrases with your own intervals (takes effect on the next roll)
     this.el.rerollMenu.querySelectorAll('[data-iv]').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -174,8 +232,11 @@ export class LearnUI {
     this.stopPlayback();
     this.cancelPerformance();
     this.kind = kind;
-    const measures = kind === 'book' ? 12 : (this.surf.w || innerWidth) < 600 ? 3 : 4;
-    this.phrase = generatePhrase({ intervals: this.intervals, voice: this.h.getVoice(), measures });
+    const tonal = this.tonality === 'tonal';
+    const measures = kind === 'book' && !tonal ? 12 : (this.surf.w || innerWidth) < 600 ? 3 : 4;
+    this.phrase = tonal
+      ? generateTonalPhrase({ style: this.style, voice: this.h.getVoice(), measures })
+      : generatePhrase({ intervals: this.intervals, voice: this.h.getVoice(), measures });
     this.reset();
   }
 
@@ -455,11 +516,12 @@ export class LearnUI {
     const sumW = wts.reduce((a, b) => a + b, 0);
     let gap = Math.max(7, Math.min(22, h / 10, w / 26));
     // Short (dice) phrases always fit the panel: shrink the staff rather than scroll
-    if (this.kind !== 'book') gap = Math.max(7, Math.min(gap, (w - 20) / (sumW * 2.2 + 5.2)));
+    const sigN = Math.abs(this.phrase.sig || 0);
+    if (this.kind !== 'book' || this.tonality === 'tonal') gap = Math.max(7, Math.min(gap, (w - 20) / (sumW * 2.2 + 5.2 + sigN * 0.95)));
     const top = h / 2 - 2 * gap; // top staff line
     const bottomD = this.phrase.clef === 'treble' ? 30 : 18; // E4 / G2 = bottom line (diatonic number)
     const yOf = (n) => top + 4 * gap - ((n.oct * 7 + LETTERS.indexOf(n.letter)) - bottomD) * gap / 2;
-    const x0 = 4.2 * gap + 12, x1 = w - gap - 8; // notes start clear of the clef
+    const x0 = (4.2 + sigN * 0.95) * gap + 12, x1 = w - gap - 8; // notes start clear of the clef and key signature
     // Long phrases keep a readable spacing and scroll; short ones stretch to fill
     const avail = x1 - x0;
     const u = sumW * gap * 2.2 <= avail ? avail / sumW : gap * 2.2;
@@ -474,16 +536,16 @@ export class LearnUI {
     });
     const contentW = x;
     this.maxScroll = Math.max(0, contentW - avail);
-    return { gap, top, yOf, xs, bars, x0, x1, avail, shown, measStart, measOf, contentW };
+    return { gap, top, yOf, xs, bars, x0, x1, avail, shown, measStart, measOf, contentW, sigN };
   }
 
   /** Accidental to print for each note (null = none): standard rule, accidentals last to the barline. */
   accidentals() {
-    const out = [];
+    const out = [], sig = keySigMap(this.phrase.sig || 0);
     let state = {};
     for (const n of this.phrase.notes) {
       const key = n.letter + n.oct;
-      const cur = state[key] ?? 0;
+      const cur = state[key] ?? sig[LETTERS.indexOf(n.letter)] ?? 0;
       out.push(n.acc !== cur ? n.acc : null);
       state[key] = n.acc;
       if (n.barAfter) state = {};
@@ -563,6 +625,18 @@ export class LearnUI {
       ctx.fillText(glyph, 16 - m.actualBoundingBoxLeft * k, y0 + m.actualBoundingBoxAscent * k);
     }
 
+    // Key signature: standard positions (treble F5 C5 G5 D5 A4 E5 B4 for sharps; B4 E5 A4 D5 G4 C5 F4 for flats)
+    if (this.phrase.sig) {
+      const sharps = this.phrase.sig > 0, shift = treble ? 0 : -14; // bass: two octaves lower on the staff
+      const pos = sharps ? [38, 35, 39, 36, 33, 37, 34] : [34, 37, 33, 36, 32, 35, 31];
+      ctx.fillStyle = 'rgba(232,234,240,.85)';
+      for (let k = 0; k < L.sigN; k++) {
+        const d = pos[k] + shift;
+        const y = yOf({ oct: Math.floor(d / 7), letter: LETTERS[d % 7] });
+        drawAcc(ctx, sharps ? 1 : -1, 4.0 * gap + 12 + k * 0.95 * gap, y, gap, 'center');
+      }
+    }
+
     // Notes (scrolled, clipped to the notes area)
     ctx.save();
     ctx.beginPath(); ctx.rect(L.x0 - gap * 1.6, 0, L.x1 - L.x0 + gap * 1.6 + 8, s.h); ctx.clip();
@@ -578,8 +652,7 @@ export class LearnUI {
       ctx.fillStyle = col; ctx.strokeStyle = col;
       // accidental
       if (L.shown[i] != null) {
-        ctx.font = `${gap * 2.6}px "Noto Music"`; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-        ctx.fillText(L.shown[i] === 1 ? '♯' : L.shown[i] === -1 ? '♭' : '♮', x - gap * 0.85, y + (L.shown[i] === -1 ? -gap * 0.3 : 0));
+        drawAcc(ctx, L.shown[i], x - gap * 0.85, y, gap, 'right');
       }
       // notehead
       ctx.save(); ctx.translate(x, y);
