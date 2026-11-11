@@ -486,24 +486,25 @@ export class LearnUI {
     const noise = ctx.createBufferSource(); noise.buffer = nb; noise.loop = true;
     const bp = ctx.createBiquadFilter(); bp.type = 'bandpass';
     const ng = ctx.createGain(); ng.gain.value = 0;
-    noise.connect(bp).connect(ng).connect(out);
+    const soft = ctx.createBiquadFilter(); soft.type = 'lowpass'; soft.frequency.value = 6500; soft.Q.value = 0.5; // no sizzle
+    noise.connect(bp).connect(soft).connect(ng).connect(out);
 
     // consonant sounds: kind, place (F2 locus / noise band), voicing, length (s)
     const CON = {
       p: { k: 'stop', burst: 900, locus: 900 }, b: { k: 'stop', burst: 900, locus: 900, v: 1 },
       t: { k: 'stop', burst: 4000, locus: 1800 }, d: { k: 'stop', burst: 3500, locus: 1800, v: 1 },
       k: { k: 'stop', burst: 2200 }, g: { k: 'stop', burst: 2200, v: 1 },
-      ts: { k: 'aff', burst: 4000, band: 5500, q: 1.4, lvl: 0.55 }, tʃ: { k: 'aff', burst: 3000, band: 3000, q: 1.2, lvl: 0.6 },
-      dʒ: { k: 'aff', burst: 3000, band: 3000, q: 1.2, lvl: 0.45, v: 1 },
+      ts: { k: 'aff', burst: 4000, band: 4800, q: 1.6, lvl: 0.24 }, tʃ: { k: 'aff', burst: 3000, band: 2800, q: 1.4, lvl: 0.26 },
+      dʒ: { k: 'aff', burst: 3000, band: 2800, q: 1.4, lvl: 0.18, v: 1 },
       f: { k: 'fric', band: 1800, q: 0.5, lvl: 0.3, locus: 900 }, v: { k: 'fric', band: 1800, q: 0.5, lvl: 0.2, v: 1, locus: 900 },
-      θ: { k: 'fric', band: 5000, q: 0.6, lvl: 0.2 }, s: { k: 'fric', band: 5500, q: 1.4, lvl: 0.6 }, z: { k: 'fric', band: 5500, q: 1.4, lvl: 0.4, v: 1 },
-      ʃ: { k: 'fric', band: 2800, q: 1.2, lvl: 0.6 }, ʒ: { k: 'fric', band: 2800, q: 1.2, lvl: 0.4, v: 1 },
+      θ: { k: 'fric', band: 4500, q: 0.6, lvl: 0.12 }, s: { k: 'fric', band: 4800, q: 1.6, lvl: 0.26 }, z: { k: 'fric', band: 4800, q: 1.6, lvl: 0.16, v: 1 },
+      ʃ: { k: 'fric', band: 2800, q: 1.4, lvl: 0.28 }, ʒ: { k: 'fric', band: 2800, q: 1.4, lvl: 0.17, v: 1 },
       h: { k: 'fric', band: 1500, q: 0.4, lvl: 0.35 },
       m: { k: 'nasal', f1: 250, f2: 1000 }, n: { k: 'nasal', f1: 250, f2: 1600 },
       l: { k: 'liquid', f1: 350, f2: 1100, f3: 2900 }, r: { k: 'tap' },
       j: { k: 'glide', f1: 280, f2: 2200 }, w: { k: 'glide', f1: 300, f2: 700 },
     };
-    const LEN = { stop: 0.07, aff: 0.1, fric: 0.09, nasal: 0.07, liquid: 0.06, tap: 0.05, glide: 0.05 };
+    const LEN = { stop: 0.07, aff: 0.09, fric: 0.075, nasal: 0.07, liquid: 0.06, tap: 0.05, glide: 0.05 };
     const vowelFor = (ipa, f0) => {
       const tuned = pitchAdjustedLandmarks(base, f0, voice);
       return tuned.find((v) => v.ipa === ipa) || tuned.find((v) => v.ipa === 'a');
