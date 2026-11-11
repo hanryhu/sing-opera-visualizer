@@ -7,7 +7,7 @@
   <meta name="description" content="Live pitch, vowel and singer's-formant feedback for classical singers.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif:wght@400;600&family=Noto+Music&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -21,7 +21,8 @@
     <div class="controls">
       <div class="segmented mode-switch" role="radiogroup" aria-label="Sound source">
         <button role="radio" data-mode="mic" aria-checked="false" title="Analyze your voice from the microphone"><svg class="mic-ico" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Sing</button>
-        <button role="radio" data-mode="synth" aria-checked="false" title="Hear a synthesized voice with your own F0, F1, F2, F3 and volume"><svg class="spk-ico" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Synthesize</button>
+        <button role="radio" data-mode="learn" aria-checked="false" title="Sight-sing a generated atonal phrase"><svg class="mic-ico" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Learn</button>
+        <button role="radio" data-mode="synth" aria-checked="false" hidden title="Hear a synthesized voice with your own F0, F1, F2, F3 and volume"><svg class="spk-ico" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Synthesize</button>
         <button role="radio" data-mode="listen" aria-checked="false" title="Listen to aria excerpts for each voice part"><svg class="spk-ico" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Listen</button>
       </div>
       <button class="toggle icon-toggle" id="detailToggle" aria-pressed="false" aria-label="Detail" title="Detail: Hz values, grids, spectrum, extra vowels"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 8h5M8 12h4M8 16h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M19.5 3.5l1 1a1.2 1.2 0 0 1 0 1.7L14 12.7l-2.7.6.6-2.7 6.5-6.5a1.2 1.2 0 0 1 1.1-.6Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
@@ -49,6 +50,24 @@
   </header>
 
   <main id="dashboard" class="dashboard" aria-live="off">
+    <section class="panel learn" id="learnPanel" hidden>
+      <div class="panel-label">Learn</div>
+      <div class="learn-tools">
+        <span id="learnScore" class="learn-score"></span>
+        <button id="learnRetry" class="toggle icon-toggle" title="Start again" aria-label="Start again"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="learn-menu split">
+          <button id="learnReroll" class="toggle icon-toggle" title="New phrase" aria-label="New phrase"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8.5" cy="8.5" r="1.4" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.4" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.4" fill="currentColor"/></svg></button>
+          <button id="learnRerollMenu" class="toggle caret-btn" aria-haspopup="true" aria-expanded="false" title="Intervals" aria-label="Intervals"><svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M2.5 4.5l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <div id="learnIntervals" class="learn-pop iv-grid" hidden></div>
+        </div>
+        <button id="learnPlay" class="toggle icon-toggle play-btn" aria-pressed="false" title="Play the melody" aria-label="Play the melody"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path class="play-tri" d="M8 5.5v13l10.5-6.5z" fill="currentColor"/><rect class="stop-sq" x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor"/></svg></button>
+        <div class="learn-menu">
+          <button id="learnBook" class="toggle book-btn" aria-haspopup="true" aria-expanded="false" title="Book" aria-label="Book"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M2.5 4.5l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <div id="learnBookMenu" class="learn-pop" hidden></div>
+        </div>
+      </div>
+      <div class="fill"><canvas id="learnCanvas"></canvas></div>
+    </section>
     <section class="panel tuner" data-panel="pitch">
       <div class="panel-label"><button class="collapse-btn" aria-expanded="true" title="Hide panel" aria-label="Hide panel"><svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>Pitch</div>
       <div class="tuner-readout">
@@ -146,7 +165,7 @@
         <h3>Sources of sound</h3>
         <dl>
           <dt>Sing</dt><dd>Analyzes your own voice through the microphone.</dd>
-          <dt>Synthesize</dt><dd>Plays an artificial vowel whose pitch, formants and volume you choose, so you can hear and see how each one shapes the sound.</dd>
+          <dt>Learn</dt><dd>Shows an atonal phrase to sight-sing and rates the pitch of each note you sing.</dd>
           <dt>Listen</dt><dd>Plays a short aria excerpt for each voice type and analyzes the singer.</dd>
         </dl>
         <p>All analysis happens on your device. Your voice is never uploaded.</p>
@@ -209,15 +228,22 @@
           <dt><svg class="help-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6a.5.5 0 0 0 .1-.6l-1.9-3.3a.5.5 0 0 0-.6-.2l-2.4 1a7.4 7.4 0 0 0-1.7-1L14.5 2.7a.5.5 0 0 0-.5-.4h-3.8a.5.5 0 0 0-.5.4L9.4 5.3a7.4 7.4 0 0 0-1.7 1l-2.4-1a.5.5 0 0 0-.6.2L2.8 8.8a.5.5 0 0 0 .1.6L4.9 11a7.6 7.6 0 0 0 0 2l-2 1.6a.5.5 0 0 0-.1.6l1.9 3.3c.1.2.4.3.6.2l2.4-1c.5.4 1.1.7 1.7 1l.4 2.6c0 .2.3.4.5.4h3.8c.2 0 .5-.2.5-.4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.4 1c.2.1.5 0 .6-.2l1.9-3.3a.5.5 0 0 0-.1-.6L19.4 13ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg> Calibrate vowels</dt><dd>Records your own vowels to replace the standard circles.</dd>
         </dl>
 
-        <h3>Synthesizer</h3>
-        <p>Set F0 to F3 and the volume by tapping the display or using the sliders, or load a preset vowel with the buttons.</p>
+        <h3>Learn</h3>
+        <p>Sing the phrase on the staff. The light bar marks your place: it waits at each note until you sing it and moves on as soon as you reach the next one. Each note turns green when you sing it within 25 cents, purple when it is flat and yellow when it is sharp. You can sing in any octave.</p>
+        <dl>
+          <dt><svg class="help-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg> Start again</dt><dd>Clears the colours and returns to the first note.</dd>
+          <dt><svg class="help-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8.5" cy="8.5" r="1.4" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.4" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.4" fill="currentColor"/></svg> New phrase</dt><dd>Generates a short phrase. The arrow beside it chooses which intervals are used.</dd>
+          <dt><svg class="help-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg> Play</dt><dd>Plays the phrase. Your singing is not followed while it plays.</dd>
+          <dt><svg class="help-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg> Book</dt><dd>Generates a longer phrase from the intervals of a chapter of <i>Modus Novus</i> (Lars Edlund). Chapter 1 uses minor and major seconds and the perfect fourth.</dd>
+        </dl>
+        <p>Long phrases scroll on their own as you sing. You can also drag or scroll them.</p>
       </div>
 
       <div class="help-text" lang="zh-Hans" hidden>
         <h3>声音来源</h3>
         <dl>
           <dt>演唱</dt><dd>通过麦克风分析你自己的声音。</dd>
-          <dt>合成</dt><dd>播放一个人工元音，音高、共振峰和音量由你选择，让你听到并看到每一项如何塑造声音。</dd>
+          <dt>视唱</dt><dd>显示一段无调性乐句供你视唱，并评定你唱的每个音的音准。</dd>
           <dt>聆听</dt><dd>为每个声部播放一段咏叹调片段，并分析其中的歌手。</dd>
         </dl>
         <p>所有分析都在你的设备上进行，你的声音不会上传。</p>
@@ -280,8 +306,15 @@
           <dt><svg class="help-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6a.5.5 0 0 0 .1-.6l-1.9-3.3a.5.5 0 0 0-.6-.2l-2.4 1a7.4 7.4 0 0 0-1.7-1L14.5 2.7a.5.5 0 0 0-.5-.4h-3.8a.5.5 0 0 0-.5.4L9.4 5.3a7.4 7.4 0 0 0-1.7 1l-2.4-1a.5.5 0 0 0-.6.2L2.8 8.8a.5.5 0 0 0 .1.6L4.9 11a7.6 7.6 0 0 0 0 2l-2 1.6a.5.5 0 0 0-.1.6l1.9 3.3c.1.2.4.3.6.2l2.4-1c.5.4 1.1.7 1.7 1l.4 2.6c0 .2.3.4.5.4h3.8c.2 0 .5-.2.5-.4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.4 1c.2.1.5 0 .6-.2l1.9-3.3a.5.5 0 0 0-.1-.6L19.4 13ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg> 校准元音</dt><dd>录下你自己的元音，替换标准圆圈。</dd>
         </dl>
 
-        <h3>合成器</h3>
-        <p>点按画面或使用滑块设置 F0 至 F3 和音量，或用按钮载入预设元音。</p>
+        <h3>视唱</h3>
+        <p>唱出五线谱上的乐句。浅色竖条标出你唱到的位置：它会在每个音上等你唱出，你一唱到下一个音就移过去。每个音唱得在 25 音分以内时变为绿色，偏低时变为紫色，偏高时变为黄色。你可以在任何八度上唱。</p>
+        <dl>
+          <dt><svg class="help-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg> 重新开始</dt><dd>清除颜色，回到第一个音。</dd>
+          <dt><svg class="help-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8.5" cy="8.5" r="1.4" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.4" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.4" fill="currentColor"/></svg> 新乐句</dt><dd>生成一段短乐句。旁边的箭头用于选择使用哪些音程。</dd>
+          <dt><svg class="help-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg> 播放</dt><dd>播放这段乐句。播放时不会跟随你的演唱。</dd>
+          <dt><svg class="help-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg> 教材</dt><dd>按 <i>Modus Novus</i>（Lars Edlund）某一章的音程生成一段较长的乐句。第 1 章使用小二度、大二度和纯四度。</dd>
+        </dl>
+        <p>较长的乐句会随你的演唱自动滚动，你也可以拖动或滚动它。</p>
       </div>
 
       <h3 class="help-sources-title">Sources</h3>
@@ -296,7 +329,8 @@
       <p>Live Pitch and Resonance visualizer</p>
       <div class="segmented mode-switch big" role="radiogroup" aria-label="Choose how to start">
         <button role="radio" data-mode="mic" aria-checked="false">Sing</button>
-        <button role="radio" data-mode="synth" aria-checked="false">Synthesize</button>
+        <button role="radio" data-mode="learn" aria-checked="false">Learn</button>
+        <button role="radio" data-mode="synth" aria-checked="false" hidden>Synthesize</button>
         <button role="radio" data-mode="listen" aria-checked="false">Listen</button>
       </div>
       <p id="errorMsg" class="error" role="alert" hidden></p>

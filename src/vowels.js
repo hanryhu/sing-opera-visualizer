@@ -36,6 +36,10 @@ export const VOICE_PRESETS = {
 
 export const SOURCES = [
   {
+    cite: 'Edlund, L. (1963). Modus Novus: Studies in reading atonal melodies. AB Nordiska Musikförlaget, Stockholm.',
+    use: 'Learn: the interval material of each chapter (phrases are generated, not copied from the book).',
+  },
+  {
     cite: 'Ferrero, F. E., Magno Caldognetto, E., Vagges, K. & Lavagnoli, C. (1978). Some acoustic characteristics of the Italian vowels. Journal of Italian Linguistics, 3, 87–96.',
     use: 'Low-voice landmarks (Standard Italian F1/F2 means).',
   },

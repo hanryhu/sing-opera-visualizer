@@ -4,6 +4,7 @@ import { renderDemo } from './demo.js';
 import { VOICE_PRESETS, extraVowels, roundingPair, SOURCES, pitchAdjustedLandmarks } from './vowels.js';
 import { CalibrationUI, calibratedLandmarks } from './calibration.js';
 import { SynthUI } from './synth.js';
+import { LearnUI } from './learn.js';
 import { SamplesUI, loadSamples, pickFile } from './sampleplayer.js';
 import { FeedbackRecorder } from './feedback.js';
 import { Surface, drawGauge, drawTrace, drawF3, drawVowelMap, drawMeter, drawVibrato, mapGeometry, f3Geometry, meterGeometry } from './ui/panels.js';
@@ -15,7 +16,7 @@ const FFT = 4096;
 const PARAMS = new URLSearchParams(location.search);
 // Dev only: ?devtest autostarts the synthetic melody silently for visual QA
 // (?devtest=a sustains one vowel, for calibration QA).
-const MUTE_DEMO = ['devtest', 'devsynth', 'devsample', 'mute'].some((k) => PARAMS.has(k)); // dev URLs are silent
+const MUTE_DEMO = ['devtest', 'devsynth', 'devsample', 'devlearn', 'mute'].some((k) => PARAMS.has(k)); // dev URLs are silent
 const $ = (id) => document.getElementById(id);
 const els = {
   landing: $('landing'), error: $('errorMsg'), toast: $('toast'),
@@ -54,6 +55,7 @@ function setVoice(v) {
   if (session?.mode === 'demo') startDemoSource();
   refreshLandmarks();
   calib?.voiceChanged();
+  learn?.voiceChanged();
   updateVoiceUI();
 }
 function setVoiceMode(m) {
@@ -133,6 +135,9 @@ dragControl(document.getElementById('f3canvas'), (_x, y, w, h) => ({ f3: f3Geome
 dragControl(document.getElementById('metercanvas'), (x, y, w, h) => ({ db: meterGeometry(w, h, view.detail).dbAt(x, y) }));
 
 let samplesUI = null;
+// Learn: sight-singing (takes Synthesize's place in the source switch; Synthesize code is kept)
+const learn = new LearnUI({ getVoice: () => voice, getCtx: () => session?.ctx || null, mute: MUTE_DEMO });
+window.__learn = learn; // dev/QA hook
 loadSamples().then((list) => {
   samplesUI = new SamplesUI(list, {
     play: (smp) => start('sample', smp),
@@ -153,7 +158,9 @@ setVoice(voice);
 async function start(mode, sample) {
   els.error.hidden = true;
   els.toast.hidden = true;
-  setSourceMode(mode === 'sample' ? 'listen' : mode === 'demo' ? null : mode);
+  const isLearn = mode === 'learn';
+  if (isLearn) mode = 'mic'; // Learn listens to the microphone
+  setSourceMode(isLearn ? 'learn' : mode === 'sample' ? 'listen' : mode === 'demo' ? null : mode);
   if (session) stop(); // switching source (e.g. mic → synth)
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
@@ -221,6 +228,12 @@ async function start(mode, sample) {
         me.out = out;
       }
       session.synthNode = node;
+    } else if (mode === 'mic' && isLearn && PARAMS.has('devlearn')) {
+      // Dev: a silent synthetic singer sings the phrase (some notes deliberately off)
+      const src = ctx.createBufferSource();
+      src.buffer = learn.renderSinger(ctx, (PARAMS.get('devlearn') || '0,0,-40,0,35,0,0,-15,0,0,50,0,0').split(',').map(Number));
+      src.connect(tap); src.start(ctx.currentTime + 0.2);
+      session.src = src;
     } else if (mode === 'mic') {
       if (!navigator.mediaDevices?.getUserMedia) {
         throw Object.assign(new Error('insecure'), { name: 'InsecureContext' });
@@ -237,7 +250,7 @@ async function start(mode, sample) {
     await ctx.resume().catch(() => {});
     els.landing.hidden = true;
     // Live dot on the active source button (replaces the old status chip)
-    document.body.dataset.live = mode === 'mic' ? 'mic' : mode === 'synth' ? 'synth' : mode === 'sample' ? 'listen' : '';
+    document.body.dataset.live = isLearn ? 'learn' : mode === 'mic' ? 'mic' : mode === 'synth' ? 'synth' : mode === 'sample' ? 'listen' : '';
     if (mode === 'synth') synth.attach(session.synthNode);
     document.body.classList.toggle('synth-on', mode === 'synth'); // shows the inline synth controls
     resetHistory();
@@ -323,7 +336,15 @@ const DEFAULT_SAMPLE = { low: 'tenor', high: 'soprano' };
 async function chooseSource(m) {
   els.landing.hidden = true; // leaving the landing page is one-way
   setSourceMode(m);
-  if (m === 'mic') {
+  if (m !== 'learn' && learn.isOpen) { learn.close(); document.body.classList.remove('learn-on'); applyLayout(); }
+  if (m === 'learn') {
+    if (!document.getElementById('synthPanel').hidden) synth.close();
+    if (samplesUI && !document.getElementById('samplesPanel').hidden) samplesUI.close();
+    document.body.classList.add('learn-on');
+    learn.open();
+    applyLayout();
+    await start('learn');
+  } else if (m === 'mic') {
     if (!document.getElementById('synthPanel').hidden) synth.close();
     if (samplesUI && !document.getElementById('samplesPanel').hidden) samplesUI.close();
     await start('mic');
@@ -350,7 +371,7 @@ let feedback = null;
 feedback = new FeedbackRecorder({
   getSession: () => session,
   describe: () => ({
-    mode: session?.mode === 'mic' ? 'Sing' : session?.mode === 'synth' ? 'Synthesize'
+    mode: session?.mode === 'mic' ? (learn.isOpen ? 'Learn' : 'Sing') : session?.mode === 'synth' ? 'Synthesize'
       : session?.mode === 'sample' ? `Listen (${session.sample.id})` : session?.mode === 'demo' ? 'Dev melody' : 'idle',
     voice, view: { ...view }, calibrated: isCalibrated, landmarks,
     synth: session?.mode === 'synth' ? { ...synth.state } : undefined,
@@ -367,6 +388,7 @@ els.exitBtn.addEventListener('click', () => {
   if (!document.getElementById('synthPanel').hidden) synth.close();
   if (samplesUI && !document.getElementById('samplesPanel').hidden) samplesUI.close();
   if (!document.getElementById('calPanel').hidden) calib.close();
+  if (learn.isOpen) { learn.close(); document.body.classList.remove('learn-on'); applyLayout(); }
   stop();
   setSourceMode(null);
   closeSettings();
@@ -410,6 +432,16 @@ function applyLayout() {
   const add = (r, a) => { rows.push(r); areas.push(a); };
   // Input level bar: a column on the right on desktop, a strip along the bottom on phones
   const side = mobile ? '' : ' meter';
+  if (document.body.classList.contains('learn-on')) {
+    // Learn: the staff on top, pitch below; vowel and F3 panels are hidden
+    add(mobile ? '230px' : 'minmax(0, 1.25fr)', `"learn learn${side}"`);
+    add(c('pitch') ? H : mobile ? 'auto' : grow, `"tuner tuner${side}"`);
+    if (mobile) add(c('input') ? H : view.detail ? '84px' : '64px', '"meter meter"');
+    dash.style.gridTemplateRows = rows.join(' ');
+    dash.style.gridTemplateAreas = areas.join(' ');
+    dash.style.gridTemplateColumns = mobile ? '' : `1fr 1fr ${c('input') ? H : view.detail ? '96px' : '76px'}`;
+    return;
+  }
   add(c('pitch') ? H : mobile ? 'auto' : grow, `"tuner tuner${side}"`);
   const mid = mobile ? '400px' : grow;
   if (c('f3') && c('vowel')) add(H, `"f3 map${side}"`);
@@ -600,6 +632,7 @@ function render() {
   els.clip.hidden = !clipping;
   els.clip.classList.toggle('on', clipping);
   drawMeter(surf.meter, rms, peakHold, { detail: view.detail, target: synthOn ? synth.state.db : null });
+  learn.tick(o, now);
   feedback?.onFrame(o, now);
 }
 requestAnimationFrame(frame);
@@ -612,6 +645,7 @@ document.addEventListener('visibilitychange', () => {
 // Autostart from URL (see MUTE_DEMO above).
 if (PARAMS.has('devtest')) start('demo');
 else if (PARAMS.has('devsynth')) synth.open();
+else if (PARAMS.has('devlearn')) { if (PARAMS.has('book')) learn.reroll('book'); chooseSource('learn'); }
 
 /* ---------------- help ---------------- */
 const help = document.getElementById('helpDialog');

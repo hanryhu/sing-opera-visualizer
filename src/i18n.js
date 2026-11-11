@@ -6,6 +6,9 @@ const ZH = {
   // Header, menus, panels
   'Vocal Analyzer': '声乐分析器',
   'Sing': '演唱', 'Synthesize': '合成', 'Listen': '聆听',
+  'Learn': '视唱', 'Sight-sing a generated atonal phrase': '视唱随机生成的无调性乐句',
+  'Start again': '重新开始', 'New phrase': '新乐句', 'Intervals': '音程', 'Play the melody': '播放旋律', 'Book': '教材',
+  'Modus Novus · Chapter 1': 'Modus Novus · 第 1 章',
   'Analyze your voice from the microphone': '通过麦克风分析你的声音',
   'Hear a synthesized voice with your own F0, F1, F2, F3 and volume': '用你设定的 F0、F1、F2、F3 和音量播放合成人声',
   'Listen to aria excerpts for each voice part': '聆听各声部的咏叹调片段',
