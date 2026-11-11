@@ -433,13 +433,20 @@ function applyLayout() {
   // Input level bar: a column on the right on desktop, a strip along the bottom on phones
   const side = mobile ? '' : ' meter';
   if (document.body.classList.contains('learn-on')) {
-    // Learn: the staff on top, pitch below; vowel and F3 panels are hidden
-    add(mobile ? '230px' : 'minmax(0, 1.25fr)', `"learn learn${side}"`);
-    add(c('pitch') ? H : mobile ? 'auto' : grow, `"tuner tuner${side}"`);
-    if (mobile) add(c('input') ? H : view.detail ? '84px' : '64px', '"meter meter"');
+    // Learn: the staff on top; below it Pitch and the vowel chart side by side, F3 a thin strip at the right
+    if (mobile) {
+      add('230px', '"learn learn"');
+      add(c('pitch') ? H : 'auto', '"tuner tuner"');
+      add(c('f3') && c('vowel') ? H : '300px', '"f3 map"');
+      add(c('input') ? H : view.detail ? '84px' : '64px', '"meter meter"');
+      dash.style.gridTemplateColumns = '';
+    } else {
+      add('minmax(0, 1.15fr)', '"learn learn learn meter"');
+      add(c('pitch') && c('vowel') && c('f3') ? H : grow, '"tuner map f3 meter"');
+      dash.style.gridTemplateColumns = `${c('pitch') ? H : 'minmax(0, 1.75fr)'} ${c('vowel') ? H : 'minmax(0, 1fr)'} ${c('f3') ? H : '80px'} ${c('input') ? H : view.detail ? '96px' : '76px'}`;
+    }
     dash.style.gridTemplateRows = rows.join(' ');
     dash.style.gridTemplateAreas = areas.join(' ');
-    dash.style.gridTemplateColumns = mobile ? '' : `1fr 1fr ${c('input') ? H : view.detail ? '96px' : '76px'}`;
     return;
   }
   add(c('pitch') ? H : mobile ? 'auto' : grow, `"tuner tuner${side}"`);
@@ -500,8 +507,9 @@ function readFrame(now) {
     timeBuf.set(demo.samples.subarray(end - FFT, end));
     return null;
   }
-  analyser.getFloatTimeDomainData(timeBuf);
-  analyser.getFloatFrequencyData(specBuf);
+  const an = learn.analysisNode() || analyser; // a Performance take plays back: analyse the recording, not the room
+  an.getFloatTimeDomainData(timeBuf);
+  an.getFloatFrequencyData(specBuf);
   return specBuf;
 }
 
@@ -585,7 +593,8 @@ function render() {
   prune(pitchHist, now, 5);
   els.detailReadout.hidden = !view.detail;
   drawGauge(surf.gauge, cents, rawCents, state, view);
-  drawTrace(surf.trace, pitchHist, now, viewCenter, { ...view, span: viewSpan });
+  const ref = learn.reference(); // Performance playback: what is written, shown apart from what was sung
+  drawTrace(surf.trace, pitchHist, now, viewCenter, { ...view, span: viewSpan, refMidi: ref?.midi });
   // Vibrato: rate + extent of the held note, against published reference bands
   if (o?.voiced && o.midiFast) vibHist.push({ t: now, midi: o.midiFast });
   prune(vibHist, now, 1.5);
@@ -614,13 +623,14 @@ function render() {
   const synthOn = session?.mode === 'synth';
   drawVowelMap(surf.map, shown, cur, formantTrail, now, {
     uncertain, detail: view.detail, calibrated: isCalibrated, f0: sungF0,
-    target: synthOn ? { f1: synth.state.f1, f2: synth.state.f2 } : null,
+    target: synthOn ? { f1: synth.state.f1, f2: synth.state.f2 } : ref?.f1 ? { f1: ref.f1, f2: ref.f2 } : null,
+    targetLabel: ref ? 'ref' : 'set',
     extras: view.detail ? extraVowels(voice) : [],
   });
   if (cur && o.voiced) lastPair = roundingPair(cur.f1, cur.f2, shown) || lastPair;
   // Detail keeps the spectrum view when silent: the last reference curve (dotted) on a faded bar
   if (o?.cluster) lastClusterPred = o.cluster.pred;
-  drawF3(surf.f3, o?.f3 || 0, f3Trail, o?.ring || 0, now, { ...view, pair: lastPair, target: synthOn ? synth.state.f3 : 0, cluster: o?.cluster || { pred: lastClusterPred } });
+  drawF3(surf.f3, o?.f3 || 0, f3Trail, o?.ring || 0, now, { ...view, pair: lastPair, target: synthOn ? synth.state.f3 : ref?.f3 || 0, cluster: o?.cluster || { pred: lastClusterPred } });
   calib.tick(o, now);
 
   // ---- Level ----

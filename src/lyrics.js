@@ -103,7 +103,7 @@ const CORPUS = {
       "and 'I will 'pledge with 'mine.",
     ],
     [ // A Red, Red Rose (Burns, 1794)
-      "O, my 'Luve is 'like a 'red, red 'rose,",
+      "O, my 'Love is 'like a 'red, red 'rose,",
       "that's 'new-ly 'sprung in 'June.",
     ],
     [ // The Tyger (Blake, 1794)
@@ -214,7 +214,7 @@ function parseLine(line, lang) {
   if (lang === 'zhS' || lang === 'zhT') {
     return line.split(' ').map((tok, i) => {
       const [simp, trad] = [tok[0], tok[1]];
-      return { text: lang === 'zhS' ? simp : trad, sub: tok.slice(2), stress: i % 2 === 0, wordEnd: true };
+      return { text: lang === 'zhS' ? simp : trad, sub: tok.slice(2), orig: tok.slice(2), stress: i % 2 === 0, wordEnd: true };
     });
   }
   const out = [];
@@ -225,13 +225,14 @@ function parseLine(line, lang) {
     syls.forEach((raw, k) => {
       const stress = raw.startsWith("'");
       let text = (stress ? raw.slice(1) : raw).replace(/_/g, '‿'); // only the leading ' is a stress mark
+      const orig = text; // as written in the source script (Cyrillic for Russian): for the singing voice
       if (lang === 'ruLat') {
         // keep punctuation, transliterate letters
         const m = text.match(/^(.*?)([.,;:!?]*)$/);
         text = latin(m[1].replace(/‿/g, ' '), stress, prevChar).replace(/ /g, '‿') + m[2];
         prevChar = raw.replace(/[_.,;:!?]/g, '').replace(/^'/, '').slice(-1).toLowerCase();
       }
-      out.push({ text, stress, wordEnd: k === syls.length - 1 });
+      out.push({ text, orig, stress, wordEnd: k === syls.length - 1 });
     });
   }
   return out;

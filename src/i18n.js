@@ -77,7 +77,7 @@ const ZH = {
   // Canvas labels
   'unrounded': '非圆唇', 'rounded': '圆唇', 'unrnd': '非圆', 'rnd': '圆',
   'RING': '共鸣', 'speech': '说话', 'ring': '共鸣', '0 dB speech': '0 dB 说话', '+6 dB ring': '+6 dB 共鸣',
-  'front': '前', 'back': '后', 'close': '闭', 'open': '开', 'set': '设定',
+  'ref': '参考', 'front': '前', 'back': '后', 'close': '闭', 'open': '开', 'set': '设定',
   'Hz · F2 top · F1 right': 'Hz · 上为 F2 · 右为 F1',
   'hold a note': '保持一个音', 'straight tone': '无颤音',
   'wide': '过宽', 'narrow': '过窄', 'fast': '过快', 'slow': '过慢', 'typical': '适中', 'a little fast': '略快', 'a little slow': '略慢', '': '',

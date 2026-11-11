@@ -163,6 +163,14 @@ export function drawTrace(s, hist, now, centerMidi, opts = {}) {
 
   // Trace (sweep: drawn where the head was at that moment; never scrolls)
   sweepHead(ctx, now, window, left, w - right, top, h - bottom);
+  // Reference pitch (Performance playback): the written note as a dashed line, apart from the sung trace
+  if (opts.refMidi) {
+    const y = yOf(opts.refMidi);
+    if (y > top - 2 && y < h - bottom + 2) {
+      ctx.save(); ctx.setLineDash([6, 5]); ctx.strokeStyle = rgba(C.accent, 0.9); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(w - right, y); ctx.stroke(); ctx.restore();
+    }
+  }
   ctx.lineWidth = 2.2; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   let prev = null, px = null;
   for (const p of hist) {
@@ -525,7 +533,8 @@ export function drawVowelMap(s, vowels, cur, trail, now, opts = {}) {
     ctx.beginPath(); ctx.moveTo(x - 17, y); ctx.lineTo(x - 7, y); ctx.moveTo(x + 7, y); ctx.lineTo(x + 17, y);
     ctx.moveTo(x, y - 17); ctx.lineTo(x, y - 7); ctx.moveTo(x, y + 7); ctx.lineTo(x, y + 17); ctx.stroke();
     ctx.font = `600 11px ${C.ui}`; ctx.fillStyle = C.accent; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-    ctx.fillText(D ? `${t('set')} ${Math.round(opts.target.f1)} / ${Math.round(opts.target.f2)}` : t('set'), x + 14, y - 10);
+    const lab = t(opts.targetLabel || 'set');
+    ctx.fillText(D ? `${lab} ${Math.round(opts.target.f1)} / ${Math.round(opts.target.f2)}` : lab, x + 14, y - 10);
     ctx.restore();
   }
 

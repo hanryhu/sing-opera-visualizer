@@ -119,7 +119,7 @@ body {
 .learn[hidden] { display: none; }
 .learn .fill { position: absolute; inset: 0; }
 #learnCanvas { touch-action: pan-y; } /* horizontal drags scroll the staff; vertical ones scroll the page */
-body.learn-on .f3, body.learn-on .vowels { display: none; }
+@media (min-width: 761px) { body.learn-on .panel.collapsed:not(.learn) .panel-label { writing-mode: vertical-rl; left: 9px; } }
 body:not(.learn-on) #learnHelp { display: none; } /* Pitch hints: a Learn setting */
 .learn-tools { position: absolute; top: 8px; right: 10px; z-index: 3; display: flex; align-items: center; gap: 6px; }
 .learn-score { font: 600 14px var(--ui); color: var(--green); font-variant-numeric: tabular-nums; margin-right: 4px; }

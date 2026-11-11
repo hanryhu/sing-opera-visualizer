@@ -8,6 +8,8 @@ import { t } from './i18n.js';
 import { spellLine, nextAtonal, tonalLine, keySigMap, TONAL_STYLES } from './melody.js';
 import { generateRhythm, generateTextRhythm, METERS, SIG_CHOICES, NOTE_VALUES, DEFAULT_RHYTHM, DEFAULT_TEMPO } from './rhythm.js';
 import { lyricLines, LANGS } from './lyrics.js';
+import { analyzeSyllable } from './phonetics.js';
+import { VOICE_PRESETS, pitchAdjustedLandmarks } from './vowels.js';
 
 /** Intervals offered for generation (semitones). */
 export const INTERVALS = [
@@ -424,6 +426,7 @@ export class LearnUI {
   }
 
   play() {
+    if (this.phrase.lang) return this.sing(); // words: the formant voice sings them
     const ctx = this.audioCtx();
     this.cancelPerformance();
     this.reset();
@@ -454,6 +457,122 @@ export class LearnUI {
     this.el.play.setAttribute('aria-pressed', 'false');
     this.el.play.title = t('Play the melody');
     if (!take) this.reset(); // a performance replay keeps its colours
+  }
+
+  /* ---------------- singing voice for phrases with words ---------------- */
+  /**
+   * Sing the phrase with the formant synthesizer: each syllable's plain vowel on its note (resonances tuned to
+   * the pitch the way trained singers do), consonants from filtered noise, closures and formant glides.
+   * Consonants before a vowel are sung just ahead of the beat so the vowel lands on it; consonants after a
+   * vowel close the note.
+   */
+  async sing() {
+    const ctx = this.audioCtx(), P = this.phrase, voice = this.h.getVoice();
+    if (this.synthCtx !== ctx) { await ctx.audioWorklet.addModule('src/synth-worklet.js'); this.synthCtx = ctx; }
+    this.cancelPerformance();
+    this.reset();
+    const lang = P.lang === 'ruLat' ? 'ru' : P.lang === 'zhS' || P.lang === 'zhT' ? 'zh' : P.lang;
+    const base = VOICE_PRESETS[voice].vowels;
+    const spb = 60 / BPM, t0 = ctx.currentTime + 0.45;
+
+    const out = ctx.createGain(); out.gain.value = this.h.mute ? 0 : 0.55; out.connect(ctx.destination);
+    const node = new AudioWorkletNode(ctx, 'formant-synth', { outputChannelCount: [1] });
+    const vg = ctx.createGain(); vg.gain.value = 0; node.connect(vg).connect(out); // voicing level (precise envelope)
+    const prm = (k) => node.parameters.get(k);
+    prm('gain').value = 1;
+    // noise for consonants: white noise → band-pass → level
+    const nb = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), nd = nb.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource(); noise.buffer = nb; noise.loop = true;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass';
+    const ng = ctx.createGain(); ng.gain.value = 0;
+    noise.connect(bp).connect(ng).connect(out);
+
+    // consonant sounds: kind, place (F2 locus / noise band), voicing, length (s)
+    const CON = {
+      p: { k: 'stop', burst: 900, locus: 900 }, b: { k: 'stop', burst: 900, locus: 900, v: 1 },
+      t: { k: 'stop', burst: 4000, locus: 1800 }, d: { k: 'stop', burst: 3500, locus: 1800, v: 1 },
+      k: { k: 'stop', burst: 2200 }, g: { k: 'stop', burst: 2200, v: 1 },
+      ts: { k: 'aff', burst: 4000, band: 5500, q: 1.4, lvl: 0.55 }, tʃ: { k: 'aff', burst: 3000, band: 3000, q: 1.2, lvl: 0.6 },
+      dʒ: { k: 'aff', burst: 3000, band: 3000, q: 1.2, lvl: 0.45, v: 1 },
+      f: { k: 'fric', band: 1800, q: 0.5, lvl: 0.3, locus: 900 }, v: { k: 'fric', band: 1800, q: 0.5, lvl: 0.2, v: 1, locus: 900 },
+      θ: { k: 'fric', band: 5000, q: 0.6, lvl: 0.2 }, s: { k: 'fric', band: 5500, q: 1.4, lvl: 0.6 }, z: { k: 'fric', band: 5500, q: 1.4, lvl: 0.4, v: 1 },
+      ʃ: { k: 'fric', band: 2800, q: 1.2, lvl: 0.6 }, ʒ: { k: 'fric', band: 2800, q: 1.2, lvl: 0.4, v: 1 },
+      h: { k: 'fric', band: 1500, q: 0.4, lvl: 0.35 },
+      m: { k: 'nasal', f1: 250, f2: 1000 }, n: { k: 'nasal', f1: 250, f2: 1600 },
+      l: { k: 'liquid', f1: 350, f2: 1100, f3: 2900 }, r: { k: 'tap' },
+      j: { k: 'glide', f1: 280, f2: 2200 }, w: { k: 'glide', f1: 300, f2: 700 },
+    };
+    const LEN = { stop: 0.07, aff: 0.1, fric: 0.09, nasal: 0.07, liquid: 0.06, tap: 0.05, glide: 0.05 };
+    const vowelFor = (ipa, f0) => {
+      const tuned = pitchAdjustedLandmarks(base, f0, voice);
+      return tuned.find((v) => v.ipa === ipa) || tuned.find((v) => v.ipa === 'a');
+    };
+    const set = (k, v, at) => prm(k).setValueAtTime(v, Math.max(ctx.currentTime, at));
+    const level = (v, at, ramp = 0.012) => { vg.gain.setTargetAtTime(v, Math.max(ctx.currentTime, at), ramp / 3); };
+    const hiss = (lvl, band, q, a, b) => {
+      bp.frequency.setValueAtTime(band, a); bp.Q.setValueAtTime(q, a);
+      ng.gain.setTargetAtTime(lvl, a, 0.004); ng.gain.setTargetAtTime(0, b - 0.008, 0.004);
+    };
+    // One consonant in [a, b); vf = the vowel it leads into (for formant transitions); returns nothing
+    const consonant = (ph, a, b, vf, f0) => {
+      const c = CON[ph];
+      if (!c) return;
+      if (c.k === 'stop' || c.k === 'aff') {
+        const rel = c.k === 'aff' ? a + (b - a) * 0.4 : b - 0.012;
+        level(c.v ? 0.12 : 0, a);                   // closure (a voiced stop keeps a murmur)
+        bp.frequency.setValueAtTime(c.burst, rel); bp.Q.setValueAtTime(0.8, rel);
+        ng.gain.setValueAtTime(0, rel); ng.gain.linearRampToValueAtTime(0.35, rel + 0.003); ng.gain.linearRampToValueAtTime(0, rel + 0.014);
+        if (c.k === 'aff') hiss(c.lvl, c.band, c.q, rel + 0.01, b);
+        if (c.locus) set('f2', c.locus, b - 0.01);    // the vowel's F2 slides in from the place of closure
+      } else if (c.k === 'fric') {
+        level(c.v ? 0.3 : 0, a);
+        hiss(c.lvl, c.band, c.q, a, b);
+        if (c.locus) set('f2', c.locus, b - 0.01);
+      } else if (c.k === 'nasal' || c.k === 'liquid' || c.k === 'glide') {
+        level(c.k === 'nasal' ? 0.4 : c.k === 'liquid' ? 0.6 : 0.7, a);
+        set('f1', c.f1, a); set('f2', c.f2, a); if (c.f3) set('f3', c.f3, a);
+      } else if (c.k === 'tap') { // a quick tongue tap: a short dip in the voice
+        level(0.6, a); level(0.15, a + 0.015, 0.006); level(0.6, a + 0.035, 0.006);
+      }
+      void vf; void f0;
+    };
+
+    // timeline: vowel starts on the beat
+    const notes = P.notes, starts = [];
+    let tt = t0;
+    for (const n of notes) { starts.push(tt); tt += n.dur * spb; }
+    const end = tt;
+    const syl = notes.map((n) => analyzeSyllable(n.syl.orig ?? n.syl.text, lang, n.syl.stress));
+    noise.start(t0 - 0.4);
+    notes.forEach((n, i) => {
+      const f0 = midiToFreq(n.midi), s = syl[i], vf = vowelFor(s.vowel, f0);
+      const tv = starts[i], tEnd = i + 1 < notes.length ? starts[i + 1] : end;
+      // onset consonants end exactly on the beat (taking time from the previous note), at most 45% of it
+      const prevLen = i ? starts[i] - starts[i - 1] : 0.4;
+      const lens = s.onset.map((ph) => LEN[CON[ph]?.k] || 0.06);
+      const total = lens.reduce((a, b) => a + b, 0), k = Math.min(1, (prevLen * 0.45) / (total || 1));
+      let a = tv - total * k;
+      const voicedOnset = s.onset.some((ph) => CON[ph]?.v || ['nasal', 'liquid', 'glide', 'tap'].includes(CON[ph]?.k));
+      prm('f0').setValueAtTime(f0, Math.max(ctx.currentTime, voicedOnset ? a : tv - 0.01)); // pitch moves with voiced consonants
+      s.onset.forEach((ph, j) => { const b = a + lens[j] * k; consonant(ph, a, b, vf, f0); a = b; });
+      // the vowel, on the beat
+      level(1, tv, 0.02);
+      set('f1', vf.f1, tv); set('f2', vf.f2, tv); set('f3', vf.f3 || 2700, tv);
+      const vib = n.dur * spb > 0.6;
+      set('vibrato', 0, tv); if (vib) set('vibrato', 0.45, tv + 0.3);
+      // closing consonant at the end of the note, before the next syllable's consonants
+      if (s.coda.length) {
+        const nextOn = i + 1 < notes.length ? syl[i + 1].onset.length : 0;
+        const room = (tEnd - tv) * 0.25, b = tEnd - (nextOn ? Math.min(0.12, (tEnd - tv) * 0.45) : 0.02);
+        consonant(s.coda[0], Math.max(tv + 0.1, b - Math.min(0.08, room)), b, vf, f0);
+        if (i + 1 < notes.length && !syl[i + 1].onset.length) level(1, b, 0.01);
+      }
+    });
+    level(0, end - 0.06, 0.03);
+    noise.stop(end + 0.2);
+    setTimeout(() => { try { node.disconnect(); } catch { /* gone */ } }, (end - ctx.currentTime) * 1000 + 600);
+    this.startPlaying({ ctx, outs: [out], times: starts, end });
   }
 
   /** Tap the first note: hear the starting pitch. Listening pauses while it sounds. */
@@ -544,15 +663,44 @@ export class LearnUI {
     const src = ctx.createBufferSource();
     src.buffer = T.buf;
     src.connect(voice);
+    if (!this.takeAnalyser || this.takeAnalyser.context !== ctx) {
+      this.takeAnalyser = ctx.createAnalyser(); this.takeAnalyser.fftSize = 4096; this.takeAnalyser.smoothingTimeConstant = 0;
+    }
+    src.connect(this.takeAnalyser); // the panels analyse the recording itself during playback
     src.start(t0, from);
-    const list = [];
+    const list = [], noteIdx = [];
     notes.forEach((nt, i) => {
       if (T.onsets[i] == null) return;
       const next = T.onsets.slice(i + 1).find((v) => v != null) ?? T.end;
       list.push({ midi: nt.midi, t: t0 + T.onsets[i] - from, d: next - T.onsets[i] - 0.03 });
+      noteIdx.push(i);
     });
     const synth = this.tones(ctx, list, 0.1);
-    this.startPlaying({ ctx, outs: [voice, synth], times: list.map((e) => e.t), end, take: true });
+    this.startPlaying({ ctx, outs: [voice, synth], times: list.map((e) => e.t), noteIdx, end, take: true });
+  }
+
+  /** During a take's playback: the analyser to read instead of the microphone. */
+  analysisNode() { return this.playing?.take ? this.takeAnalyser : null; }
+
+  /**
+   * The reference (what is written) at the playback position of a take: the note's pitch and, with words,
+   * the syllable's vowel resonances tuned to that pitch. Null when no take is playing.
+   */
+  reference() {
+    const p = this.playing;
+    if (!p?.take || !this.phrase) return null;
+    const ct = p.ctx.currentTime;
+    const i = p.times.findIndex((tt, k) => ct >= tt && ct < (p.times[k + 1] ?? p.end));
+    const n = p.noteIdx?.[i] != null ? this.phrase.notes[p.noteIdx[i]] : null;
+    if (!n) return null;
+    const ref = { midi: n.midi };
+    if (this.phrase.lang && n.syl) {
+      const lang = this.phrase.lang === 'ruLat' ? 'ru' : this.phrase.lang.startsWith('zh') ? 'zh' : this.phrase.lang;
+      const ipa = analyzeSyllable(n.syl.orig ?? n.syl.text, lang, n.syl.stress).vowel, voice = this.h.getVoice();
+      const v = pitchAdjustedLandmarks(VOICE_PRESETS[voice].vowels, midiToFreq(n.midi), voice).find((x) => x.ipa === ipa);
+      if (v) Object.assign(ref, { f1: v.f1, f2: v.f2, f3: v.f3 || VOICE_PRESETS[voice].vowels.find((x) => x.ipa === ipa)?.f3 });
+    }
+    return ref;
   }
 
   /** Dev: a silent synthetic singer for this phrase (cents detune per note), as an AudioBuffer. */
