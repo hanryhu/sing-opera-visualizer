@@ -317,7 +317,7 @@ export class LearnUI {
   voiceChanged() { if (this.isOpen && !this.started) this.reroll(); }
 
   reset() {
-    this.idx = 0; this.started = false; this.done = false;
+    this.idx = 0; this.started = false; this.done = false; this.octShift = null;
     this.cents = []; this.ratings = []; this.live = null; this.take = null;
     this.noteT = 0; this.nextSince = null; this.silentSince = null;
     this.wrongSince = null; this.offSince = null; this.hintedIdx = -1;
@@ -327,7 +327,12 @@ export class LearnUI {
   }
 
   /** Cents from a note's target, folded to the nearest octave (sing in any octave). */
-  static off(midi, target) {
+  off(midi, target) {
+    if (this.octShift != null) return (midi - target - this.octShift) * 100;
+    return LearnUI.fold(midi, target);
+  }
+
+  static fold(midi, target) {
     let c = ((midi - target) * 100) % 1200;
     if (c > 600) c -= 1200; if (c < -600) c += 1200;
     return c;
@@ -350,14 +355,19 @@ export class LearnUI {
     const quiet = this.playing || now < (this.quietUntil || 0); // ignore the speaker during playback
     if (!quiet && !this.done && o?.voiced && o.midiFast) {
       this.silentSince = null;
-      const cur = LearnUI.off(o.midiFast, notes[this.idx].midi);
-      const nxt = this.idx + 1 < notes.length ? LearnUI.off(o.midiFast, notes[this.idx + 1].midi) : Infinity;
+      const cur = this.off(o.midiFast, notes[this.idx].midi);
+      const nxt = this.idx + 1 < notes.length ? this.off(o.midiFast, notes[this.idx + 1].midi) : Infinity;
       // Move on when the singer is clearly on the next note, or has left this one (after holding it most
       // of its length) for a pitch near the next: a note sung ~50 c off sits halfway between the two.
       const held = now - this.noteT, minHold = Math.max(0.35, 0.7 * notes[this.idx].dur * 60 / BPM);
       const onNext = Math.abs(nxt) < ADVANCE && Math.abs(nxt) < Math.abs(cur);
       const leftForNext = Math.abs(cur) > 35 && Math.abs(nxt) < MATCH && held >= minHold;
-      if (this.started && (onNext || leftForNext)) {
+      // ...but only after this note has really been sung for a moment (no skipping ahead on a scoop or a
+      // vibrato swing); a note never found is let go after a while so the bar can't get stuck
+      const durS = notes[this.idx].dur * 60 / BPM;
+      const sungEnough = this.cents.length >= 6 && held >= Math.min(0.45, 0.4 * durS + 0.1);
+      const givenUp = held >= Math.max(1.2, 1.5 * durS);
+      if (this.started && (onNext || leftForNext) && (sungEnough || givenUp)) {
         // On the next note: move there once it has held briefly (vibrato and glides cross over)
         this.nextSince ??= now;
         if (now - this.nextSince >= SWITCH_HOLD) {
@@ -368,8 +378,11 @@ export class LearnUI {
       } else {
         this.nextSince = null;
         if (Math.abs(cur) < MATCH) {
-          if (!this.started) { this.started = true; this.noteT = now; this.markOnset(now); }
-          if (now - this.noteT > ONSET_SKIP) this.cents.push(LearnUI.off(o.midiRaw || o.midiFast, notes[this.idx].midi));
+          if (!this.started) {
+            this.started = true; this.noteT = now; this.markOnset(now);
+            this.octShift = 12 * Math.round((o.midiFast - notes[0].midi) / 12); // sing in your own octave
+          }
+          if (now - this.noteT > ONSET_SKIP) this.cents.push(this.off(o.midiRaw || o.midiFast, notes[this.idx].midi));
           this.live = this.rate(this.cents.slice(-20));
         }
       }
@@ -505,7 +518,11 @@ export class LearnUI {
       j: { k: 'glide', f1: 280, f2: 2200 }, w: { k: 'glide', f1: 300, f2: 700 },
     };
     const LEN = { stop: 0.07, aff: 0.09, fric: 0.075, nasal: 0.07, liquid: 0.06, tap: 0.05, glide: 0.05 };
+    // ɤ (Mandarin e) and ə are not among the landmarks: low-voice values, scaled for high voices
+    const k = voice === 'high' ? 1.15 : 1;
+    const EXTRA = { ɤ: { ipa: 'ɤ', f1: 460 * k, f2: 1150 * k, f3: 2450 * k }, ə: { ipa: 'ə', f1: 500 * k, f2: 1500 * k, f3: 2500 * k } };
     const vowelFor = (ipa, f0) => {
+      if (EXTRA[ipa]) { const v = EXTRA[ipa]; return { ...v, f1: Math.max(v.f1, f0 * 1.05) }; }
       const tuned = pitchAdjustedLandmarks(base, f0, voice);
       return tuned.find((v) => v.ipa === ipa) || tuned.find((v) => v.ipa === 'a');
     };
@@ -559,7 +576,13 @@ export class LearnUI {
       s.onset.forEach((ph, j) => { const b = a + lens[j] * k; consonant(ph, a, b, vf, f0); a = b; });
       // the vowel, on the beat
       level(1, tv, 0.02);
-      set('f1', vf.f1, tv); set('f2', vf.f2, tv); set('f3', vf.f3 || 2700, tv);
+      const vSet = (v, at) => { set('f1', v.f1, at); set('f2', v.f2, at); set('f3', v.f3 || 2700, at); };
+      if (s.from) { vSet(vowelFor(s.from, f0), tv); vSet(vf, tv + 0.07); } // glide in (ia, uo, ui ...)
+      else vSet(vf, tv);
+      if (s.to) { // glide out late in the note (ai, ao, ou, English I, day, go ...)
+        const vt = vowelFor(s.to, f0), tg = tv + Math.max(0.12, (tEnd - tv) * 0.62);
+        ['f1', 'f2', 'f3'].forEach((p) => { prm(p).setValueAtTime(p === 'f1' ? vf.f1 : p === 'f2' ? vf.f2 : vf.f3 || 2700, tg); prm(p).linearRampToValueAtTime(p === 'f1' ? vt.f1 : p === 'f2' ? vt.f2 : vt.f3 || 2700, tg + 0.14); });
+      }
       const vib = n.dur * spb > 0.6;
       set('vibrato', 0, tv); if (vib) set('vibrato', 0.45, tv + 0.3);
       // closing consonant at the end of the note, before the next syllable's consonants

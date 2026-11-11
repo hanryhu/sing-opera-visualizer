@@ -32,6 +32,7 @@ function consonants(cl, lang, next) {
     else if (r.startsWith('ch')) take(2, lang === 'it' ? 'k' : lang === 'fr' ? 'ʃ' : lang === 'de' ? 'h' : 'tʃ');
     else if (r.startsWith('sh')) take(2, 'ʃ');
     else if (r.startsWith('th')) take(2, lang === 'en' ? 'θ' : 't');
+    else if (r.startsWith('gh') && lang === 'en') i += 2; // night, though: silent
     else if (r.startsWith('ph')) take(2, 'f');
     else if (r.startsWith('gn')) take(2, 'n');
     else if (r.startsWith('gl') && lang === 'it') take(2, 'l');
@@ -52,9 +53,32 @@ function consonants(cl, lang, next) {
   return out;
 }
 
+/** Pinyin final: glide in, nucleus, glide out (Mandarin e is ɤ, a mid back vowel; ui is u-e-i). */
+function zhFinal(py) {
+  let p = strip(py).replace(/u:/g, 'ü');
+  const init = (p.match(/^(zh|ch|sh|[bpmfdtnlgkhjqxrzcs])/) || [''])[0];
+  let f = p.slice(init.length);
+  // y-/w- spellings, and u after j q x is ü
+  if (init === '') f = f.replace(/^yi/, 'i').replace(/^yu/, 'ü').replace(/^y/, 'i').replace(/^wu/, 'u').replace(/^w/, 'u');
+  if (/^[jqx]$/.test(init)) f = f.replace(/^u/, 'ü');
+  if (/^(zh|ch|sh|r|z|c|s)$/.test(init) && f === 'i') return 'ɤ'; // zhi chi shi ri zi ci si
+  const T = {
+    a: 'a', o: { from: 'u', v: 'o' }, e: 'ɤ', i: 'i', u: 'u', ü: 'i', er: 'ɤ',
+    ai: { v: 'a', to: 'i' }, ei: { v: 'e', to: 'i' }, ao: { v: 'a', to: 'u' }, ou: { v: 'o', to: 'u' },
+    ia: { from: 'i', v: 'a' }, ie: { from: 'i', v: 'e' }, ua: { from: 'u', v: 'a' }, uo: { from: 'u', v: 'o' }, üe: { from: 'i', v: 'e' },
+    iao: { from: 'i', v: 'a', to: 'u' }, iu: { from: 'i', v: 'o', to: 'u' }, iou: { from: 'i', v: 'o', to: 'u' },
+    uai: { from: 'u', v: 'a', to: 'i' }, ui: { from: 'u', v: 'e', to: 'i' }, uei: { from: 'u', v: 'e', to: 'i' },
+    an: 'a', en: 'ə', ang: 'a', eng: 'ɤ', ong: 'u', in: 'i', ing: 'i', un: { from: 'u', v: 'ə' }, uen: { from: 'u', v: 'ə' },
+    ün: 'i', ian: { from: 'i', v: 'ɛ' }, uan: { from: 'u', v: 'a' }, üan: { from: 'i', v: 'ɛ' },
+    iang: { from: 'i', v: 'a' }, uang: { from: 'u', v: 'a' }, iong: { from: 'i', v: 'u' }, ueng: { from: 'u', v: 'ɤ' },
+  };
+  if (/^[bpmf]o$/.test(init + f)) return { from: 'u', v: 'o' };
+  return T[f] ?? (/a/.test(f) ? 'a' : /o/.test(f) ? 'o' : /e/.test(f) ? 'ɤ' : /i/.test(f) ? 'i' : 'u');
+}
+
 /** The plain vowel the syllable is sung on. */
 function vowelOf(w, lang, stressed) {
-  const PLAIN = (v) => ({ y: 'i', ø: 'e', ə: 'e', ɪ: 'i', ʌ: 'a', ɑ: 'a', æ: 'a', ʊ: 'u' }[v] || v);
+  const PLAIN = (v) => ({ y: 'i', ø: 'e', ɪ: 'i', ʌ: 'a', ɑ: 'a', æ: 'a', ʊ: 'u' }[v] || v);
   if (lang === 'ru') {
     const m = w.match(/[аеёиоуыэюя]/);
     if (!m) return 'a';
@@ -66,17 +90,7 @@ function vowelOf(w, lang, stressed) {
     if (v === 'и' || v === 'ы') return 'i';
     return 'u';
   }
-  if (lang === 'zh') {
-    const p = strip(w);
-    if (/^(zh|ch|sh|r|z|c|s)i$/.test(p)) return 'e';
-    if (/^[jqxy]u/.test(p) || /ü/.test(w)) return 'i';
-    if (/a/.test(p)) return 'a';
-    if (/o/.test(p)) return 'o';
-    if (/ie|ei/.test(p)) return 'e';
-    if (/e/.test(p)) return 'e';
-    if (/i/.test(p)) return 'i';
-    return 'u';
-  }
+  if (lang === 'zh') return zhFinal(w);
   if (lang === 'fr') {
     if (/eau|au/.test(w)) return 'o';
     if (/ou|où/.test(w)) return 'u';
@@ -104,18 +118,23 @@ function vowelOf(w, lang, stressed) {
     return m ? m[0] : 'e';
   }
   if (lang === 'en') {
+    const AI = { v: 'a', to: 'i' }, EI = { v: 'e', to: 'i' }, OU = { v: 'o', to: 'u' }, AU = { v: 'a', to: 'u' };
+    if (/^(i|eye|eyes|aye)$/.test(w) || /igh/.test(w) || /i[^aeiou]e$/.test(w) || /^[^aeiou]*ie$/.test(w)) return AI;
+    if (/^[^aeiouy]+y$/.test(w)) return stressed ? AI : 'i';   // my, thy, sky (stressed) — -ly, -ty (unstressed)
     if (/ee|ea|ie|^(e|thee|me|he|she|we|be)$/.test(w)) return 'i';
     if (/oo/.test(w)) return 'u';
-    if (/ou|ow/.test(w)) return 'a';
-    if (/ai|ay|ey/.test(w)) return 'e';
-    if (/oa|o$/.test(w)) return 'o';
-    if (/igh|^i$/.test(w)) return 'a';
-    if (/y$/.test(w)) return w.length > 2 ? 'i' : 'a';
+    if (/oy|oi/.test(w)) return { v: 'ɔ', to: 'i' };
+    if (/(l|r|gr|kn|bl|fl|gl|sh|sn|thr|sl|cr)ow$/.test(w)) return OU; // low, know, snow (but now, how: au)
+    if (/ou|ow/.test(w)) return AU;
+    if (/ai|ay|ey/.test(w) || /a[^aeiou]e$/.test(w)) return EI;
+    if (/(^|[^r])ove$|^(c|s)ome$|^(d|n)one$/.test(w)) return 'a'; // love, come, done
+    if (/oa|o[^aeiou]e$|o$/.test(w)) return OU;
+    if (/u[^aeiou]e$/.test(w)) return 'u';
     if (/ar/.test(w)) return 'a';
-    if (/er|ir|ur/.test(w)) return 'e';
+    if (/er|ir|ur|ear/.test(w)) return 'ə';
     if (/or|aw|au/.test(w)) return 'ɔ';
     const m = w.match(/[aeiou]/);
-    return m ? PLAIN({ a: 'æ', e: 'ɛ', i: 'ɪ', o: 'ɔ', u: 'ʌ' }[m[0]]) : 'e';
+    return m ? PLAIN({ a: 'æ', e: 'ɛ', i: 'ɪ', o: 'ɔ', u: 'ʌ' }[m[0]]) : 'ə';
   }
   // Italian: i/u beside another vowel are glides (pie-, uo-, -ia); è = ɛ, ò = ɔ
   const x = w.replace(/^(sc|c|g)i(?=[aeou])/, '$1').replace(/gli(?=[aeou])/, 'gl');
@@ -138,10 +157,15 @@ export function analyzeSyllable(text, lang, stressed) {
   while (i < raw.length && !isV(raw[i])) i++;
   let j = raw.length;
   while (j > i && !isV(raw[j - 1])) j--;
-  const onset = consonants(raw.slice(0, i), lang, raw[i]).slice(-2);
+  let onset = consonants(raw.slice(0, i), lang, raw[i]).slice(-2);
   let coda = consonants(raw.slice(j).replace(/[ьъ]/g, ''), lang, '');
   if (lang === 'fr' && /^(s|t|x|z|d|ent|es|nt)$/.test(raw.slice(j))) coda = []; // silent final letters
+  if (lang === 'en') coda = coda.filter((ph) => ph !== 'w' && ph !== 'j'); // now, day: part of the vowel
   if (lang === 'fr' && /[aeiouy][nm]$/.test(raw)) coda = []; // nasal vowel, no n
-  if (lang === 'zh') coda = /ng?$/.test(raw) ? ['n'] : [];
-  return { onset, vowel: vowelOf(raw, lang, stressed), coda: coda.slice(0, 1) };
+  if (lang === 'zh') {
+    coda = /ng?$/.test(raw) ? ['n'] : [];
+    onset = onset.filter((ph) => ph !== 'j' && ph !== 'w'); // y-/w- are part of the final's glide
+  }
+  const v = vowelOf(raw, lang, stressed), o = typeof v === 'string' ? { v } : v;
+  return { onset, vowel: o.v, from: o.from, to: o.to, coda: coda.slice(0, 1) };
 }
