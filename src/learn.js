@@ -1029,10 +1029,11 @@ export class LearnUI {
         ctx.lineTo(xb, beamY(xb) - dir * off - dir * th); ctx.lineTo(xa, beamY(xa) - dir * off - dir * th);
         ctx.closePath(); ctx.fill();
       };
-      ctx.fillStyle = C.text;
-      beam(a.stemX, z.stemX, 0);
+      // each stretch of beam takes the colour of the note it leaves (its rating), like the note heads
+      it.slice(0, -1).forEach((hd, k) => { ctx.fillStyle = colorOf(hd.i); beam(hd.stemX, it[k + 1].stemX, 0); });
       it.forEach((hd, k) => {
         if (hd.pc.type.base !== '16') return;
+        ctx.fillStyle = colorOf(hd.i);
         const nb = it[k + 1], pb = it[k - 1];
         if (nb && nb.pc.type.base === '16') beam(hd.stemX, nb.stemX, gap * 0.75); // second beam, toward the heads
         else if (!(pb && pb.pc.type.base === '16')) { // lone sixteenth: a short stub toward its neighbour
@@ -1042,6 +1043,7 @@ export class LearnUI {
       });
       if (a.pc.tup) {
         ctx.font = `italic 700 ${gap * 1.25}px "Noto Serif", Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = C.text;
         const cx = (a.stemX + z.stemX) / 2;
         ctx.fillText('3', cx, beamY(cx) + dir * gap * 1.1);
       }
