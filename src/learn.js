@@ -6,6 +6,7 @@ import { Surface, C } from './ui/panels.js';
 import { midiToFreq } from './dsp/pitch.js';
 import { t } from './i18n.js';
 import { spellLine, nextAtonal, tonalLine, keySigMap, TONAL_STYLES } from './melody.js';
+import { generateRhythm, METERS, SIG_CHOICES, NOTE_VALUES, DEFAULT_RHYTHM, DEFAULT_TEMPO } from './rhythm.js';
 
 /** Intervals offered for generation (semitones). */
 export const INTERVALS = [
@@ -33,43 +34,32 @@ const LETTERS = 'CDEFGAB';
 const rnd = (n) => Math.floor(Math.random() * n);
 const pick = (a) => a[rnd(a.length)];
 
-/** Rhythm: measures of 4/4 in quarters and halves, ending on a long note. strong = starts on beat 1 or 3. */
-function rhythm(measures) {
-  const BODY = [[1, 1, 1, 1], [2, 1, 1], [1, 1, 2], [1, 2, 1], [1, 1, 1, 1]];
-  const END = [[1, 1, 2], [2, 2], [1, 1, 2]];
-  const durs = [];
-  for (let m = 0; m < measures; m++) {
-    let beat = 0;
-    for (const [i, d, a] of (m === measures - 1 ? pick(END) : pick(BODY)).map((d, i, a) => [i, d, a])) {
-      durs.push({ d, bar: i === a.length - 1, strong: beat === 0 || beat === 2 });
-      beat += d;
-    }
-  }
-  return durs;
+/** Attach pitches to a rhythm: events become notes with a MIDI pitch and their written pieces. */
+function assemble(rh, mids, spelled, voice, extra = {}) {
+  const notes = rh.events.map((e, i) => ({ ...e, midi: mids[i], ...(spelled[i] || {}) }));
+  return { notes, measures: rh.measures, clef: voice === 'high' ? 'treble' : 'bass', ...extra };
 }
 
 /** Tonal phrase in a style (pentatonic, diatonic, blues, chromatic, modern), with a key signature. */
-export function generateTonalPhrase({ style, voice = 'low', measures = 4 }) {
+export function generateTonalPhrase({ style, voice = 'low', measures = 4, rhythm: R = DEFAULT_RHYTHM, tempo: T = DEFAULT_TEMPO }) {
   const [lo, hi] = RANGE[voice] || RANGE.low;
-  const durs = rhythm(measures);
-  const line = tonalLine(style, durs.length, durs.map((d) => d.strong), lo, hi);
-  const notes = line.notes.map((n, i) => ({ midi: n.midi, dur: durs[i].d, barAfter: durs[i].bar && i < durs.length - 1, sp: n.spelled }));
-  const fallback = spellLine(notes);
-  notes.forEach((n, i) => { Object.assign(n, n.sp || fallback[i]); delete n.sp; });
-  return { notes, clef: voice === 'high' ? 'treble' : 'bass', sig: line.sig, scale: line.scaleId };
+  const rh = generateRhythm(R, T, measures);
+  const line = tonalLine(style, rh.events.length, rh.events.map((e) => e.strong), lo, hi);
+  const mids = line.notes.map((n) => n.midi);
+  const fallback = spellLine(mids.map((midi) => ({ midi })));
+  const spelled = line.notes.map((n, i) => n.spelled || fallback[i]);
+  return assemble(rh, mids, spelled, voice, { sig: line.sig, scale: line.scaleId });
 }
 
 /** Random atonal phrase. */
-export function generatePhrase({ intervals, voice = 'low', measures = 4 }) {
+export function generatePhrase({ intervals, voice = 'low', measures = 4, rhythm: R = DEFAULT_RHYTHM, tempo: T = DEFAULT_TEMPO }) {
   const [lo, hi] = RANGE[voice] || RANGE.low;
   const steps = INTERVALS.filter((i) => intervals.includes(i.id)).map((i) => i.st);
   if (!steps.length) steps.push(1, 2);
-  const durs = rhythm(measures);
+  const rh = generateRhythm(R, T, measures);
   const mids = [Math.round((lo + hi) / 2 - 3 + rnd(7))];
-  while (mids.length < durs.length) mids.push(nextAtonal(mids, steps, lo, hi));
-  const notes = mids.map((midi, i) => ({ midi, dur: durs[i].d, barAfter: durs[i].bar && i < durs.length - 1 }));
-  spellLine(notes).forEach((sp, i) => Object.assign(notes[i], sp));
-  return { notes, clef: voice === 'high' ? 'treble' : 'bass' };
+  while (mids.length < rh.events.length) mids.push(nextAtonal(mids, steps, lo, hi));
+  return assemble(rh, mids, spellLine(mids.map((midi) => ({ midi }))), voice);
 }
 
 /**
@@ -108,6 +98,11 @@ export class LearnUI {
     // First visit: tonal pentatonic, the easiest to sing
     try { this.tonality = localStorage.getItem('va.learn.tonality') === 'atonal' ? 'atonal' : 'tonal'; } catch { this.tonality = 'tonal'; }
     try { this.style = TONAL_STYLES.includes(localStorage.getItem('va.learn.style')) ? localStorage.getItem('va.learn.style') : 'pentatonic'; } catch { this.style = 'pentatonic'; }
+    // Rhythm and Tempo settings (note values, dots, triplets, ties; time signatures, changes, bar count)
+    const load = (k, d) => { try { return { ...d, ...JSON.parse(localStorage.getItem(k) || '{}') }; } catch { return { ...d }; } };
+    this.rhythm = load('va.learn.rhythm', DEFAULT_RHYTHM);
+    this.tempo = load('va.learn.tempo', DEFAULT_TEMPO);
+    this.page = 0; // dice menu page: Pitch, Rhythm, Tempo
     this.phrase = null;
     this.playing = null;
     this.barX = null;
@@ -174,11 +169,63 @@ export class LearnUI {
       try {
         localStorage.setItem('va.learn.intervals', JSON.stringify(this.intervals)); localStorage.setItem('va.learn.kind', this.kind);
         localStorage.setItem('va.learn.tonality', this.tonality); localStorage.setItem('va.learn.style', this.style);
+        localStorage.setItem('va.learn.rhythm', JSON.stringify(this.rhythm)); localStorage.setItem('va.learn.tempo', JSON.stringify(this.tempo));
       } catch { /* ignore */ }
     };
+    const keep = (e) => { e.stopPropagation(); save(); this.renderMenus(); this.el.rerollMenu.hidden = false; };
+    const PAGES = ['Pitch', 'Rhythm', 'Tempo'];
+    const head = `<div class="pg-head"><button type="button" class="pg-arrow" data-pg="-1" aria-label="${t('Previous')}">‹</button>` +
+      `<span>${t(PAGES[this.page])}</span><button type="button" class="pg-arrow" data-pg="1" aria-label="${t('Next')}">›</button></div>`;
+    const bindPages = () => this.el.rerollMenu.querySelectorAll('[data-pg]').forEach((b) => b.addEventListener('click', (e) => {
+      this.page = (this.page + Number(b.dataset.pg) + PAGES.length) % PAGES.length; keep(e);
+    }));
+    if (this.page === 1) { // Rhythm
+      const R = this.rhythm;
+      const GLYPH = { 16: '\u{1D161}', 8: '\u{1D160}', q: '\u{1D15F}', h: '\u{1D15E}', w: '\u{1D15D}' };
+      const NAME = { 16: 'Sixteenth', 8: 'Eighth', q: 'Quarter', h: 'Half', w: 'Whole' };
+      this.el.rerollMenu.innerHTML = head +
+        `<div class="nv-grid">${NOTE_VALUES.map((v) => `<button type="button" class="iv-chip nv-chip" data-nv="${v}" aria-pressed="${R.values.includes(v)}" title="${t(NAME[v])}" aria-label="${t(NAME[v])}">${GLYPH[v]}</button>`).join('')}</div>` +
+        `<div class="opt-grid">${[['dotted', 'Dotted'], ['triplets', 'Triplets'], ['ties', 'Ties']].map(([k, l]) =>
+          `<button type="button" class="iv-chip" data-ropt="${k}" aria-pressed="${!!R[k]}">${t(l)}</button>`).join('')}</div>`;
+      bindPages();
+      this.el.rerollMenu.querySelectorAll('[data-nv]').forEach((b) => b.addEventListener('click', (e) => {
+        const v = b.dataset.nv, on = R.values.includes(v);
+        if (on && R.values.length === 1) return e.stopPropagation(); // keep at least one
+        R.values = on ? R.values.filter((x) => x !== v) : NOTE_VALUES.filter((x) => x === v || R.values.includes(x));
+        keep(e);
+      }));
+      this.el.rerollMenu.querySelectorAll('[data-ropt]').forEach((b) => b.addEventListener('click', (e) => { R[b.dataset.ropt] = !R[b.dataset.ropt]; keep(e); }));
+      return;
+    }
+    if (this.page === 2) { // Tempo
+      const T = this.tempo;
+      const LABEL = { cut: '\u00A2', '3/4': '3/4', '4/4': '4/4', '6/8': '6/8', other: t('Other') };
+      this.el.rerollMenu.innerHTML = head +
+        `<div class="sig-grid">${SIG_CHOICES.map((k) => `<button type="button" class="iv-chip" data-sig="${k}" aria-pressed="${T.sigs.includes(k)}"${k === 'cut' ? ` title="${t('Cut time')}"` : ''}>${LABEL[k]}</button>`).join('')}</div>` +
+        `<button type="button" class="iv-chip wide-chip" data-tchg aria-pressed="${!!T.changes}">${t('Time signature changes')}</button>` +
+        `<div class="meas-row"><span>${t('Bars')}</span>` +
+        `<button type="button" class="step" data-meas="min:-1">−</button><b>${T.min}</b><button type="button" class="step" data-meas="min:1">+</button>` +
+        `<span class="dash">–</span>` +
+        `<button type="button" class="step" data-meas="max:-1">−</button><b>${T.max}</b><button type="button" class="step" data-meas="max:1">+</button></div>`;
+      bindPages();
+      this.el.rerollMenu.querySelectorAll('[data-sig]').forEach((b) => b.addEventListener('click', (e) => {
+        const k = b.dataset.sig, on = T.sigs.includes(k);
+        if (on && T.sigs.length === 1) return e.stopPropagation();
+        T.sigs = on ? T.sigs.filter((x) => x !== k) : SIG_CHOICES.filter((x) => x === k || T.sigs.includes(x));
+        keep(e);
+      }));
+      this.el.rerollMenu.querySelector('[data-tchg]').addEventListener('click', (e) => { T.changes = !T.changes; keep(e); });
+      this.el.rerollMenu.querySelectorAll('[data-meas]').forEach((b) => b.addEventListener('click', (e) => {
+        const [k, d] = b.dataset.meas.split(':');
+        T[k] = Math.max(1, Math.min(30, T[k] + Number(d)));
+        if (T.min > T.max) { if (k === 'min') T.max = T.min; else T.min = T.max; }
+        keep(e);
+      }));
+      return;
+    }
     const book = this.tonality === 'atonal' && this.kind === 'book' ? BOOK.find((b) => b.intervals.join() === this.intervals.join()) : null;
     const STYLE_NAMES = { pentatonic: 'Pentatonic', diatonic: 'Diatonic', blues: 'Blues', chromatic: 'Chromatic', modern: 'Modern' };
-    const seg = `<div class="segmented ton-seg" role="radiogroup">` +
+    const seg = head + `<div class="segmented ton-seg" role="radiogroup">` +
       ['atonal', 'tonal'].map((k) => `<button type="button" role="radio" data-ton="${k}" aria-checked="${this.tonality === k}">${t(k === 'atonal' ? 'Atonal' : 'Tonal')}</button>`).join('') + `</div>`;
     if (this.tonality === 'tonal') {
       this.el.rerollMenu.innerHTML = seg + `<div class="style-grid">${TONAL_STYLES.map((k) =>
@@ -196,6 +243,7 @@ export class LearnUI {
       if (this.tonality === 'tonal') this.kind = 'random';
       save(); this.renderMenus(); this.el.rerollMenu.hidden = false;
     }));
+    bindPages();
     this.el.rerollMenu.querySelectorAll('[data-style]').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
       this.style = b.dataset.style;
@@ -234,10 +282,12 @@ export class LearnUI {
     this.cancelPerformance();
     this.kind = kind;
     const tonal = this.tonality === 'tonal';
-    const measures = kind === 'book' && !tonal ? 12 : (this.surf.w || innerWidth) < 600 ? 3 : 4;
+    const T = this.tempo;
+    const measures = kind === 'book' && !tonal ? 12 : T.min + rnd(T.max - T.min + 1);
+    const opts = { voice: this.h.getVoice(), measures, rhythm: this.rhythm, tempo: T };
     this.phrase = tonal
-      ? generateTonalPhrase({ style: this.style, voice: this.h.getVoice(), measures })
-      : generatePhrase({ intervals: this.intervals, voice: this.h.getVoice(), measures });
+      ? generateTonalPhrase({ style: this.style, ...opts })
+      : generatePhrase({ intervals: this.intervals, ...opts });
     this.reset();
   }
 
@@ -508,48 +558,72 @@ export class LearnUI {
   }
 
   /* ---------------- drawing ---------------- */
+  /** Positions of everything along the staff, in content coordinates (scrolling adds an offset). */
   layout() {
     const { w, h } = this.surf;
-    const notes = this.phrase.notes;
-    // width weight: base + duration + room for an accidental + barline
-    const shown = this.accidentals();
-    const wts = notes.map((n, i) => 1 + 0.35 * (n.dur - 1) + (shown[i] != null ? 0.45 : 0) + (n.barAfter ? 0.35 : 0));
-    const sumW = wts.reduce((a, b) => a + b, 0);
+    const P = this.phrase, notes = P.notes, shown = this.accidentals();
+    const sigN = Math.abs(P.sig || 0);
+    const place = (gap) => {
+      let x = 0;
+      const heads = [], measStart = [], bars = [], sigs = [], xs = [];
+      let ni = 0;
+      P.measures.forEach((mz, m) => {
+        measStart[m] = x;
+        if (mz.showSig) { sigs.push({ x: x + gap * 1.1, meter: mz.meter }); x += gap * 2.6; }
+        x += gap * 0.5;
+        // pieces of this bar, in time order
+        const ps = [];
+        notes.forEach((n, i) => n.pieces.forEach((pc, k) => { if (pc.m === m) ps.push({ n, i, k, pc }); }));
+        ps.sort((a, b) => a.pc.start - b.pc.start);
+        for (const it of ps) {
+          const acc = it.k === 0 && shown[it.i] != null;
+          if (acc) x += gap * 1.0;
+          heads.push({ ...it, x: x + gap * 0.6 });
+          if (it.k === 0) xs[it.i] = x + gap * 0.6;
+          x += gap * (1.25 + 1.45 * Math.sqrt(it.pc.dur)) + (it.pc.type.dots ? gap * 0.5 : 0);
+          ni++;
+        }
+        if (m < P.measures.length - 1) { bars.push(x + gap * 0.2); x += gap * 0.7; }
+      });
+      return { heads, measStart, bars, sigs, xs, contentW: x };
+    };
     let gap = Math.max(7, Math.min(22, h / 10, w / 26));
-    // Short (dice) phrases always fit the panel: shrink the staff rather than scroll
-    const sigN = Math.abs(this.phrase.sig || 0);
-    if (this.kind !== 'book' || this.tonality === 'tonal') gap = Math.max(7, Math.min(gap, (w - 20) / (sumW * 2.2 + 5.2 + sigN * 0.95)));
+    const x1 = w - gap - 8;
+    const x0Of = (g) => (4.2 + sigN * 0.95) * g + 12;
+    let Lp = place(gap);
+    // Short (dice) phrases fit the panel: shrink the staff (down to a readable size) before scrolling
+    if (this.kind !== 'book') {
+      const fit = gap * (x1 - x0Of(gap)) / Lp.contentW;
+      if (fit < gap) { gap = Math.max(12, gap * 0.7, fit * 0.98); Lp = place(gap); } // then scroll if still too long
+    }
+    const x0 = x0Of(gap), avail = x1 - x0;
+    // a short phrase stretches to fill the width
+    if (Lp.contentW < avail) {
+      const k = avail / Lp.contentW;
+      const sc = (v) => v * k;
+      Lp.heads.forEach((hd) => { hd.x = sc(hd.x); });
+      Lp.xs = Lp.xs.map(sc); Lp.measStart = Lp.measStart.map(sc); Lp.bars = Lp.bars.map(sc);
+      Lp.sigs.forEach((sg) => { sg.x = sc(sg.x); });
+      Lp.contentW = avail;
+    }
     const top = h / 2 - 2 * gap; // top staff line
-    const bottomD = this.phrase.clef === 'treble' ? 30 : 18; // E4 / G2 = bottom line (diatonic number)
+    const bottomD = P.clef === 'treble' ? 30 : 18; // E4 / G2 = bottom line (diatonic number)
     const yOf = (n) => top + 4 * gap - ((n.oct * 7 + LETTERS.indexOf(n.letter)) - bottomD) * gap / 2;
-    const x0 = (4.2 + sigN * 0.95) * gap + 12, x1 = w - gap - 8; // notes start clear of the clef and key signature
-    // Long phrases keep a readable spacing and scroll; short ones stretch to fill
-    const avail = x1 - x0;
-    const u = sumW * gap * 2.2 <= avail ? avail / sumW : gap * 2.2;
-    let x = 0;
-    const xs = [], bars = [], measStart = [0], measOf = [];
-    notes.forEach((n, i) => {
-      const accW = shown[i] != null ? 0.45 * u : 0;
-      xs.push(x + accW + u * 0.35);
-      measOf.push(measStart.length - 1);
-      x += wts[i] * u;
-      if (n.barAfter) { bars.push(x - u * 0.2); measStart.push(x - u * 0.2); }
-    });
-    const contentW = x;
-    this.maxScroll = Math.max(0, contentW - avail);
-    return { gap, top, yOf, xs, bars, x0, x1, avail, shown, measStart, measOf, contentW, sigN };
+    this.maxScroll = Math.max(0, Lp.contentW - avail);
+    const measOf = notes.map((n) => n.m);
+    return { ...Lp, gap, top, yOf, x0, x1, avail, shown, measOf, sigN };
   }
 
   /** Accidental to print for each note (null = none): standard rule, accidentals last to the barline. */
   accidentals() {
     const out = [], sig = keySigMap(this.phrase.sig || 0);
-    let state = {};
+    let state = {}, bar = -1;
     for (const n of this.phrase.notes) {
+      if (n.m !== bar) { state = {}; bar = n.m; }
       const key = n.letter + n.oct;
       const cur = state[key] ?? sig[LETTERS.indexOf(n.letter)] ?? 0;
       out.push(n.acc !== cur ? n.acc : null);
       state[key] = n.acc;
-      if (n.barAfter) state = {};
     }
     return out;
   }
@@ -592,30 +666,45 @@ export class LearnUI {
     this.scrollTarget = Math.min(this.scrollTarget, this.maxScroll);
     this.scroll += (this.scrollTarget - this.scroll) * (1 - Math.exp(-dt / 0.18));
     const sx = (cx) => L.x0 + cx - this.scroll; // content → screen
+    const clip = () => { ctx.beginPath(); ctx.rect(L.x0 - gap * 1.6, 0, L.x1 - L.x0 + gap * 1.6 + 8, s.h); ctx.clip(); };
     const bw = gap * 2.2;
     const g = ctx.createLinearGradient(0, top - 3 * gap, 0, top + 7 * gap);
     g.addColorStop(0, 'rgba(124,196,255,0)'); g.addColorStop(0.5, 'rgba(124,196,255,.22)'); g.addColorStop(1, 'rgba(124,196,255,0)');
-    ctx.save();
-    ctx.beginPath(); ctx.rect(L.x0 - gap * 1.6, 0, L.x1 - L.x0 + gap * 1.6 + 8, s.h); ctx.clip(); // notes area (the clef stays put)
+    ctx.save(); clip();
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.roundRect(sx(this.barX) - bw / 2, top - 3 * gap, bw, 10 * gap, bw / 2); ctx.fill();
     ctx.restore();
 
-    // Staff
-    ctx.strokeStyle = 'rgba(232,234,240,.45)'; ctx.lineWidth = 1;
+    // Staff, barlines, final double bar
+    const LINE = 'rgba(232,234,240,.45)', INK = 'rgba(232,234,240,.85)';
+    ctx.strokeStyle = LINE; ctx.lineWidth = 1;
     const ex = sx(L.contentW), staffEnd = Math.min(L.x1 + 6, ex + 3);
     for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.moveTo(12, top + k * gap); ctx.lineTo(staffEnd, top + k * gap); ctx.stroke(); }
-    ctx.save();
-    ctx.beginPath(); ctx.rect(L.x0 - gap * 1.6, 0, L.x1 - L.x0 + gap * 1.6 + 8, s.h); ctx.clip();
-    ctx.beginPath(); ctx.moveTo(ex - 3, top); ctx.lineTo(ex - 3, top + 4 * gap); ctx.stroke(); // final double bar
+    ctx.save(); clip();
+    ctx.beginPath(); ctx.moveTo(ex - 3, top); ctx.lineTo(ex - 3, top + 4 * gap); ctx.stroke();
     ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(ex + 1.5, top); ctx.lineTo(ex + 1.5, top + 4 * gap); ctx.stroke();
     ctx.lineWidth = 1;
     for (const bx of L.bars) { ctx.beginPath(); ctx.moveTo(sx(bx), top); ctx.lineTo(sx(bx), top + 4 * gap); ctx.stroke(); }
+    // Time signatures (at the start and wherever the meter changes)
+    ctx.fillStyle = INK; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const sg of L.sigs) {
+      const x = sx(sg.x), M = METERS[sg.meter];
+      if (sg.meter === 'cut') {
+        ctx.font = `700 ${gap * 3.1}px "Noto Serif", Georgia, serif`;
+        ctx.fillText('C', x, top + 2 * gap + gap * 0.1);
+        ctx.lineWidth = 1.6; ctx.strokeStyle = INK;
+        ctx.beginPath(); ctx.moveTo(x, top - gap * 0.6); ctx.lineTo(x, top + 4.6 * gap); ctx.stroke();
+        ctx.strokeStyle = LINE; ctx.lineWidth = 1;
+      } else {
+        ctx.font = `700 ${gap * 2.3}px "Noto Serif", Georgia, serif`;
+        ctx.fillText(String(M.num), x, top + gap * 1.05);
+        ctx.fillText(String(M.den), x, top + gap * 3.05);
+      }
+    }
     ctx.restore();
 
-    // Clef (Noto Music)
-    // Fit the glyph by its measured ink box (font metrics vary): treble spans ~7 spaces, bass ~3
-    ctx.fillStyle = 'rgba(232,234,240,.85)'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    // Clef (Noto Music): fit the glyph by its measured ink box (font metrics vary)
+    ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     const treble = this.phrase.clef === 'treble', glyph = treble ? '\u{1D11E}' : '\u{1D122}';
     ctx.font = '100px "Noto Music"';
     const m = ctx.measureText(glyph), ink = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
@@ -625,56 +714,149 @@ export class LearnUI {
       ctx.font = `${100 * k}px "Noto Music"`;
       ctx.fillText(glyph, 16 - m.actualBoundingBoxLeft * k, y0 + m.actualBoundingBoxAscent * k);
     }
-
     // Key signature: standard positions (treble F5 C5 G5 D5 A4 E5 B4 for sharps; B4 E5 A4 D5 G4 C5 F4 for flats)
     if (this.phrase.sig) {
-      const sharps = this.phrase.sig > 0, shift = treble ? 0 : -14; // bass: two octaves lower on the staff
+      const sharps = this.phrase.sig > 0, shift = treble ? 0 : -14;
       const pos = sharps ? [38, 35, 39, 36, 33, 37, 34] : [34, 37, 33, 36, 32, 35, 31];
-      ctx.fillStyle = 'rgba(232,234,240,.85)';
       for (let k = 0; k < L.sigN; k++) {
         const d = pos[k] + shift;
-        const y = yOf({ oct: Math.floor(d / 7), letter: LETTERS[d % 7] });
-        drawAcc(ctx, sharps ? 1 : -1, 4.0 * gap + 12 + k * 0.95 * gap, y, gap, 'center');
+        drawAcc(ctx, sharps ? 1 : -1, 4.0 * gap + 12 + k * 0.95 * gap, yOf({ oct: Math.floor(d / 7), letter: LETTERS[d % 7] }), gap, 'center');
       }
     }
 
-    // Notes (scrolled, clipped to the notes area)
-    ctx.save();
-    ctx.beginPath(); ctx.rect(L.x0 - gap * 1.6, 0, L.x1 - L.x0 + gap * 1.6 + 8, s.h); ctx.clip();
-    notes.forEach((n, i) => {
-      const x = sx(xs[i]), y = yOf(n);
-      if (x < L.x0 - gap * 3 || x > L.x1 + gap * 3) return;
+    // ---- notes ----
+    ctx.save(); clip();
+    const mid = top + 2 * gap;
+    const colorOf = (i) => {
       const r = i < this.idx || this.done ? this.ratings[i] : i === this.idx && this.started ? this.live : null;
-      const col = r?.state && COLORS[r.state] ? COLORS[r.state] : r?.state === 'missed' ? C.faint : C.text;
-      ctx.strokeStyle = 'rgba(232,234,240,.45)';
-      // ledger lines
+      return r?.state && COLORS[r.state] ? COLORS[r.state] : r?.state === 'missed' ? C.faint : C.text;
+    };
+    const flagged = (hd) => hd.pc.type.base === '8' || hd.pc.type.base === '16';
+    // beam groups: flagged notes within one beat (a triplet is always one group)
+    const meterBounds = (mi) => {
+      const M = METERS[this.phrase.measures[mi].meter], b = [0];
+      M.beats.forEach((v) => b.push(b[b.length - 1] + v));
+      return b.map((v) => v + this.phrase.measures[mi].start);
+    };
+    const groups = [];
+    let cur = null;
+    for (const hd of L.heads) {
+      const bounds = meterBounds(hd.pc.m);
+      const beatIdx = bounds.findIndex((b, k) => hd.pc.start >= b - 1e-6 && hd.pc.start < (bounds[k + 1] ?? Infinity) - 1e-6);
+      const key = hd.pc.tup || `${hd.pc.m}:${beatIdx}`;
+      if (flagged(hd) && cur && cur.key === key) cur.items.push(hd);
+      else { cur = flagged(hd) ? { key, items: [hd] } : null; if (cur) groups.push(cur); }
+      hd.group = cur;
+    }
+    for (const gr of groups) {
+      const ys = gr.items.map((hd) => yOf(hd.n));
+      gr.up = ys.reduce((a, b) => a + b, 0) / ys.length > mid;
+    }
+    // heads, ledger lines, accidentals, dots, stems, flags
+    for (const hd of L.heads) {
+      const x = sx(hd.x), y = yOf(hd.n), base = hd.pc.type.base;
+      if (x < L.x0 - gap * 3 || x > L.x1 + gap * 3) { hd.vis = false; continue; }
+      hd.vis = true; hd.sx = x; hd.y = y;
+      const col = colorOf(hd.i);
+      ctx.strokeStyle = LINE; ctx.lineWidth = 1;
       for (let ly = top + 5 * gap; ly <= y + 0.1; ly += gap) { ctx.beginPath(); ctx.moveTo(x - gap * 0.95, ly); ctx.lineTo(x + gap * 0.95, ly); ctx.stroke(); }
       for (let ly = top - gap; ly >= y - 0.1; ly -= gap) { ctx.beginPath(); ctx.moveTo(x - gap * 0.95, ly); ctx.lineTo(x + gap * 0.95, ly); ctx.stroke(); }
       ctx.fillStyle = col; ctx.strokeStyle = col;
-      // accidental
-      if (L.shown[i] != null) {
-        drawAcc(ctx, L.shown[i], x - gap * 0.85, y, gap, 'right');
-      }
-      // notehead
-      ctx.save(); ctx.translate(x, y);
-      ctx.beginPath();
-      if (n.dur >= 4) { // whole note: wider, upright oval with a hole tilted the other way
-        ctx.ellipse(0, 0, gap * 0.78, gap * 0.48, 0, 0, Math.PI * 2);
-        ctx.ellipse(0, 0, gap * 0.42, gap * 0.26, 1.0, 0, Math.PI * 2);
-      } else {
+      if (hd.k === 0 && L.shown[hd.i] != null) drawAcc(ctx, L.shown[hd.i], x - gap * 0.85, y, gap, 'right');
+      ctx.save(); ctx.translate(x, y); ctx.beginPath();
+      if (base === 'w') { ctx.ellipse(0, 0, gap * 0.78, gap * 0.48, 0, 0, Math.PI * 2); ctx.ellipse(0, 0, gap * 0.42, gap * 0.26, 1.0, 0, Math.PI * 2); }
+      else {
         ctx.ellipse(0, 0, gap * 0.62, gap * 0.44, -0.35, 0, Math.PI * 2);
-        if (n.dur >= 2) ctx.ellipse(0, 0, gap * 0.5, gap * 0.19, -0.6, 0, Math.PI * 2); // half note: hole inside the same outline
+        if (base === 'h') ctx.ellipse(0, 0, gap * 0.5, gap * 0.19, -0.6, 0, Math.PI * 2);
       }
-      ctx.fill('evenodd');
-      ctx.restore();
-      if (i === 0) this.firstNote = { x, y, r: gap * 1.4 };
-      // stem
-      if (n.dur < 4) {
-        const up = y > top + 2 * gap;
-        const stemX = up ? x + gap * 0.56 : x - gap * 0.56;
-        ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(stemX, y + (up ? -gap * 0.15 : gap * 0.15)); ctx.lineTo(stemX, y + (up ? -3.4 * gap : 3.4 * gap)); ctx.stroke();
+      ctx.fill('evenodd'); ctx.restore();
+      if (hd.pc.type.dots) {
+        const onLine = Math.round((y - top) / (gap / 2)) % 2 === 0;
+        ctx.beginPath(); ctx.arc(x + gap * (base === 'w' ? 1.2 : 1.0), y - (onLine ? gap * 0.5 : 0), gap * 0.17, 0, Math.PI * 2); ctx.fill();
       }
-    });
+      if (hd.i === 0 && hd.k === 0) this.firstNote = { x, y, r: gap * 1.4 };
+      if (base === 'w') continue;
+      const up = hd.group ? hd.group.up : y > mid;
+      hd.up = up; hd.stemX = up ? x + gap * 0.56 : x - gap * 0.56;
+      if (!hd.group || hd.group.items.length === 1) {
+        // single note: plain stem, and flags for eighths and sixteenths
+        const end = y + (up ? -3.4 * gap : 3.4 * gap);
+        ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(hd.stemX, y + (up ? -gap * 0.15 : gap * 0.15)); ctx.lineTo(hd.stemX, end); ctx.stroke();
+        const nFlags = base === '8' ? 1 : base === '16' ? 2 : 0;
+        for (let f = 0; f < nFlags; f++) {
+          const fy = end + (up ? 1 : -1) * f * gap * 0.85, dir = up ? 1 : -1;
+          ctx.beginPath(); ctx.moveTo(hd.stemX, fy);
+          ctx.bezierCurveTo(hd.stemX + gap * 0.1, fy + dir * gap * 1.0, hd.stemX + gap * 1.15, fy + dir * gap * 1.2, hd.stemX + gap * 0.8, fy + dir * gap * 2.4);
+          ctx.bezierCurveTo(hd.stemX + gap * 0.95, fy + dir * gap * 1.5, hd.stemX + gap * 0.2, fy + dir * gap * 1.25, hd.stemX, fy + dir * gap * 0.75);
+          ctx.fill();
+        }
+      }
+    }
+    // beams (with stems reaching them), secondary beams for sixteenths, triplet numbers
+    for (const gr of groups) {
+      const it = gr.items.filter((hd) => hd.vis);
+      if (it.length !== gr.items.length) continue;
+      if (it.length === 1) continue;
+      const up = gr.up, dir = up ? -1 : 1, a = it[0], z = it[it.length - 1];
+      let slope = (z.y - a.y) / Math.max(1, z.stemX - a.stemX);
+      slope = Math.max(-0.25, Math.min(0.25, slope)) * 0.5;
+      let y0 = a.y + dir * 3.3 * gap;
+      const beamY = (x) => y0 + slope * (x - a.stemX);
+      for (const hd of it) { // every stem at least 2.6 spaces long: move the beam away from the heads if needed
+        const diff = beamY(hd.stemX) - (hd.y + dir * 2.6 * gap);
+        if (up ? diff > 0 : diff < 0) y0 -= diff;
+      }
+      ctx.strokeStyle = C.text; ctx.fillStyle = C.text;
+      for (const hd of it) {
+        ctx.strokeStyle = colorOf(hd.i);
+        ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(hd.stemX, hd.y + dir * gap * 0.15); ctx.lineTo(hd.stemX, beamY(hd.stemX)); ctx.stroke();
+      }
+      const th = gap * 0.45;
+      const beam = (xa, xb, off) => {
+        ctx.beginPath();
+        ctx.moveTo(xa, beamY(xa) - dir * off); ctx.lineTo(xb, beamY(xb) - dir * off);
+        ctx.lineTo(xb, beamY(xb) - dir * off - dir * th); ctx.lineTo(xa, beamY(xa) - dir * off - dir * th);
+        ctx.closePath(); ctx.fill();
+      };
+      ctx.fillStyle = C.text;
+      beam(a.stemX, z.stemX, 0);
+      it.forEach((hd, k) => {
+        if (hd.pc.type.base !== '16') return;
+        const nb = it[k + 1], pb = it[k - 1];
+        if (nb && nb.pc.type.base === '16') beam(hd.stemX, nb.stemX, gap * 0.75); // second beam, toward the heads
+        else if (!(pb && pb.pc.type.base === '16')) { // lone sixteenth: a short stub toward its neighbour
+          const to = nb ? Math.min(hd.stemX + gap * 1.0, nb.stemX) : Math.max(hd.stemX - gap * 1.0, pb.stemX);
+          beam(Math.min(hd.stemX, to), Math.max(hd.stemX, to), gap * 0.75);
+        }
+      });
+      if (a.pc.tup) {
+        ctx.font = `italic 700 ${gap * 1.25}px "Noto Serif", Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const cx = (a.stemX + z.stemX) / 2;
+        ctx.fillText('3', cx, beamY(cx) + dir * gap * 1.1);
+      }
+    }
+    // triplets that aren't beamed (quarter-note triplets): a bracket with 3
+    const tups = {};
+    for (const hd of L.heads) if (hd.pc.tup && hd.vis && !(hd.group && hd.group.items.length > 1)) (tups[hd.pc.tup] ||= []).push(hd);
+    for (const list of Object.values(tups)) {
+      const a = list[0], z = list[list.length - 1], up = (a.up ?? true);
+      const y = (up ? Math.min(...list.map((h) => h.y)) - 4.2 * gap : Math.max(...list.map((h) => h.y)) + 4.2 * gap);
+      ctx.strokeStyle = C.text; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(a.sx - gap * 0.6, y + (up ? gap * 0.5 : -gap * 0.5)); ctx.lineTo(a.sx - gap * 0.6, y); ctx.lineTo(z.sx + gap * 0.6, y); ctx.lineTo(z.sx + gap * 0.6, y + (up ? gap * 0.5 : -gap * 0.5)); ctx.stroke();
+      ctx.fillStyle = '#12151c'; ctx.fillRect((a.sx + z.sx) / 2 - gap * 0.6, y - gap * 0.6, gap * 1.2, gap * 1.2);
+      ctx.fillStyle = C.text; ctx.font = `italic 700 ${gap * 1.25}px "Noto Serif", Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('3', (a.sx + z.sx) / 2, y);
+    }
+    // ties: a curve from each piece to the next piece of the same note, away from the stems
+    for (const n of notes) {
+      for (let k = 0; k < n.pieces.length - 1; k++) {
+        const a = L.heads.find((hd) => hd.n === n && hd.k === k), b = L.heads.find((hd) => hd.n === n && hd.k === k + 1);
+        if (!a?.vis || !b?.vis) continue;
+        const down = !(a.up ?? (a.y > mid)) ? -1 : 1, y = a.y + down * gap * 0.75;
+        ctx.strokeStyle = colorOf(a.i); ctx.lineWidth = gap * 0.16;
+        ctx.beginPath(); ctx.moveTo(a.sx + gap * 0.5, y); ctx.quadraticCurveTo((a.sx + b.sx) / 2, y + down * gap * 0.9, b.sx - gap * 0.5, y); ctx.stroke();
+      }
+    }
     ctx.restore();
   }
 }
