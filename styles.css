@@ -117,7 +117,8 @@ body {
 .meter { grid-area: meter; }
 .learn { grid-area: learn; }
 .learn[hidden] { display: none; }
-.learn .fill { position: absolute; inset: 0; }
+.learn .fill { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; }
+.panel.learn { overflow: visible; z-index: 5; } /* its menus may hang below the panel */
 #learnCanvas { touch-action: pan-y; } /* horizontal drags scroll the staff; vertical ones scroll the page */
 @media (min-width: 761px) { body.learn-on .panel.collapsed:not(.learn) .panel-label { writing-mode: vertical-rl; left: 9px; } }
 body:not(.learn-on) #learnHelp { display: none; } /* Pitch hints: a Learn setting */
@@ -143,6 +144,7 @@ body:not(.learn-on) #learnHelp { display: none; } /* Pitch hints: a Learn settin
   background: var(--panel-2); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: 0 20px 50px rgba(0, 0, 0, .55);
 }
 .learn-pop[hidden] { display: none; }
+.learn-pop { max-height: min(70dvh, 480px); overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .learn-pop .sm-row { white-space: nowrap; gap: 14px; }
 .learn-pop .sm-row small { color: var(--faint); }
 .iv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; min-width: 220px; }
