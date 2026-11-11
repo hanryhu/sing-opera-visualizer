@@ -136,9 +136,12 @@ export class LearnUI {
       this.scroll = this.scrollTarget = clamp(this.scroll + d);
     }, { passive: false });
     let drag = null;
-    const onFirst = (e) => {
-      const f = this.firstNote, r = cv.getBoundingClientRect();
-      return f && Math.hypot(e.clientX - r.left - f.x, e.clientY - r.top - f.y) < f.r;
+    // tap any note to hear its pitch
+    const noteAt = (e) => {
+      const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+      let best = null, bd = Infinity;
+      for (const h of this.hits || []) { const d = Math.hypot(x - h.x, y - h.y); if (d < h.r && d < bd) { bd = d; best = h; } }
+      return best;
     };
     cv.addEventListener('pointerdown', (e) => {
       drag = { x: e.clientX, s: this.scroll, moved: false };
@@ -148,9 +151,9 @@ export class LearnUI {
       if (drag) {
         if (Math.abs(e.clientX - drag.x) > 6) drag.moved = true;
         if (drag.moved && this.maxScroll) this.scroll = this.scrollTarget = clamp(drag.s - (e.clientX - drag.x));
-      } else cv.style.cursor = onFirst(e) ? 'pointer' : '';
+      } else cv.style.cursor = noteAt(e) ? 'pointer' : '';
     });
-    cv.addEventListener('pointerup', (e) => { if (drag && !drag.moved && onFirst(e)) this.playStartPitch(); drag = null; });
+    cv.addEventListener('pointerup', (e) => { const h = drag && !drag.moved && noteAt(e); if (h) this.playStartPitch(h.i); drag = null; });
     cv.addEventListener('pointercancel', () => { drag = null; });
     this.el.play.addEventListener('click', () => (this.playing ? this.stopPlayback() : this.done && this.take ? this.playTake() : this.play()));
     const toggleMenu = (btn, menu) => (e) => {
@@ -599,10 +602,10 @@ export class LearnUI {
     this.startPlaying({ ctx, outs: [out], times: starts, end });
   }
 
-  /** Tap the first note: hear the starting pitch. Listening pauses while it sounds. */
-  playStartPitch() {
+  /** Tap a note: hear its pitch. Listening pauses while it sounds. */
+  playStartPitch(i = 0) {
     const ctx = this.audioCtx();
-    this.tones(ctx, [{ midi: this.phrase.notes[0].midi, t: ctx.currentTime + 0.03, d: 1 }], 0.25);
+    this.tones(ctx, [{ midi: this.phrase.notes[i].midi, t: ctx.currentTime + 0.03, d: 1 }], 0.25);
     this.quietUntil = performance.now() / 1000 + 1.3;
   }
 
@@ -964,6 +967,8 @@ export class LearnUI {
       gr.up = ys.reduce((a, b) => a + b, 0) / ys.length > mid;
     }
     // heads, ledger lines, accidentals, dots, stems, flags
+    const hits = [];
+    this.hits = hits; // tap targets
     for (const hd of L.heads) {
       const x = sx(hd.x), y = yOf(hd.n), base = hd.pc.type.base;
       if (x < L.x0 - gap * 3 || x > L.x1 + gap * 3) { hd.vis = false; continue; }
@@ -985,7 +990,7 @@ export class LearnUI {
         const onLine = Math.round((y - top) / (gap / 2)) % 2 === 0;
         ctx.beginPath(); ctx.arc(x + gap * (base === 'w' ? 1.2 : 1.0), y - (onLine ? gap * 0.5 : 0), gap * 0.17, 0, Math.PI * 2); ctx.fill();
       }
-      if (hd.i === 0 && hd.k === 0) this.firstNote = { x, y, r: gap * 1.4 };
+      hits.push({ x, y, r: gap * 1.4, i: hd.i });
       if (base === 'w') continue;
       const up = hd.group ? hd.group.up : y > mid;
       hd.up = up; hd.stemX = up ? x + gap * 0.56 : x - gap * 0.56;
