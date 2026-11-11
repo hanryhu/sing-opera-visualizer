@@ -124,11 +124,17 @@ body:not(.learn-on) #learnHelp { display: none; } /* Pitch hints: a Learn settin
 .learn-tools { position: absolute; top: 8px; right: 10px; z-index: 3; display: flex; align-items: center; gap: 6px; }
 .learn-score { font: 600 14px var(--ui); color: var(--green); font-variant-numeric: tabular-nums; margin-right: 4px; }
 .learn-menu { position: relative; display: flex; }
-.learn-menu.split > .icon-toggle { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.caret-btn { width: 20px; height: 32px; padding: 0; display: inline-grid; place-items: center; border-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+/* Dice: one rectangular button; the narrow arrow strip opens the menu */
+.split-btn { border: 1px solid var(--line); border-radius: 9px; background: var(--panel); height: 32px; align-items: stretch; overflow: visible; }
+.split-btn:hover { border-color: var(--line-strong); }
+.split-btn > button { background: none; border: 0; color: var(--muted); cursor: pointer; display: inline-grid; place-items: center; padding: 0; }
+.split-btn > button:hover { color: var(--text); }
+.split-main { width: 34px; border-radius: 9px 0 0 9px; }
+.split-caret { width: 16px; border-left: 1px solid var(--line) !important; border-radius: 0 9px 9px 0; }
+.split-caret[aria-expanded="true"] { color: var(--accent); }
 .play-btn .stop-sq { display: none; }
 .perf-btn .rec-dot { display: none; }
-.perf-btn[aria-pressed="true"] { color: #fff; border-color: rgba(255, 77, 94, .6); background: rgba(255, 77, 94, .15); }
+.toggle.perf-btn[aria-pressed="true"] { color: #fff; border-color: rgba(255, 77, 94, .6); background: rgba(255, 77, 94, .15); }
 .perf-btn[aria-pressed="true"] .rec-dot { display: inline; animation: pulse 1.6s infinite; }
 .play-btn[aria-pressed="true"] .play-tri { display: none; }
 .play-btn[aria-pressed="true"] .stop-sq { display: inline; }

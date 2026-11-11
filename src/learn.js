@@ -5,6 +5,7 @@
 import { Surface, C } from './ui/panels.js';
 import { midiToFreq } from './dsp/pitch.js';
 import { t } from './i18n.js';
+import { spellLine, nextAtonal } from './melody.js';
 
 /** Intervals offered for generation (semitones). */
 export const INTERVALS = [
@@ -28,20 +29,11 @@ const BPM = 72;
 const HINT_NOTE = 0.55;   // s per note when Help plays the right note and the next
 const ONSET_LAG = 0.08;   // s the follower detects a note after it is sung (analysis window + hold)
 
-const SHARP = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
-const FLAT = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
 const LETTERS = 'CDEFGAB';
 const rnd = (n) => Math.floor(Math.random() * n);
 const pick = (a) => a[rnd(a.length)];
 
-/** Spell a MIDI note: sharps going up, flats going down. */
-function spell(midi, up) {
-  const pc = ((midi % 12) + 12) % 12, oct = Math.floor(midi / 12) - 1;
-  const name = (up ? SHARP : FLAT)[pc];
-  return { letter: name[0], acc: name[1] === '♯' ? 1 : name[1] === '♭' ? -1 : 0, oct };
-}
-
-/** Random phrase: measures of 4/4 in quarters and halves, ending on a long note. */
+/** Random atonal phrase: measures of 4/4 in quarters and halves, ending on a long note. */
 export function generatePhrase({ intervals, voice = 'low', measures = 4 }) {
   const [lo, hi] = RANGE[voice] || RANGE.low;
   const steps = INTERVALS.filter((i) => intervals.includes(i.id)).map((i) => i.st);
@@ -50,25 +42,10 @@ export function generatePhrase({ intervals, voice = 'low', measures = 4 }) {
   const END = [[1, 1, 2], [2, 2], [1, 1, 2]];
   const durs = [];
   for (let m = 0; m < measures; m++) durs.push(...(m === measures - 1 ? pick(END) : pick(BODY)).map((d, i, a) => ({ d, bar: i === a.length - 1 })));
-  const mid = (lo + hi) / 2;
-  let midi = Math.round(mid - 3 + rnd(7));
-  const notes = [];
-  for (let i = 0; i < durs.length; i++) {
-    let up = true;
-    if (i > 0) {
-      let next = null;
-      for (let tries = 0; tries < 30 && next == null; tries++) {
-        const st = pick(steps);
-        const goUp = Math.random() < (midi > mid ? 0.35 : 0.65);
-        const cand = midi + (goUp ? st : -st);
-        // stay in range; avoid returning to the note two back (keeps lines moving)
-        if (cand >= lo && cand <= hi && (notes.length < 2 || cand !== notes[notes.length - 2].midi)) { next = cand; up = goUp; }
-      }
-      if (next == null) { const st = pick(steps); up = midi < mid; next = midi + (up ? st : -st); }
-      midi = next;
-    }
-    notes.push({ midi, dur: durs[i].d, barAfter: durs[i].bar && i < durs.length - 1, ...spell(midi, up) });
-  }
+  const mids = [Math.round((lo + hi) / 2 - 3 + rnd(7))];
+  while (mids.length < durs.length) mids.push(nextAtonal(mids, steps, lo, hi));
+  const notes = mids.map((midi, i) => ({ midi, dur: durs[i].d, barAfter: durs[i].bar && i < durs.length - 1 }));
+  spellLine(notes).forEach((sp, i) => Object.assign(notes[i], sp));
   return { notes, clef: voice === 'high' ? 'treble' : 'bass' };
 }
 
@@ -117,15 +94,22 @@ export class LearnUI {
       this.scroll = this.scrollTarget = clamp(this.scroll + d);
     }, { passive: false });
     let drag = null;
+    const onFirst = (e) => {
+      const f = this.firstNote, r = cv.getBoundingClientRect();
+      return f && Math.hypot(e.clientX - r.left - f.x, e.clientY - r.top - f.y) < f.r;
+    };
     cv.addEventListener('pointerdown', (e) => {
-      if (!this.maxScroll) return;
-      drag = { x: e.clientX, s: this.scroll };
+      drag = { x: e.clientX, s: this.scroll, moved: false };
       try { cv.setPointerCapture(e.pointerId); } catch { /* not all pointers capture */ }
     });
-    cv.addEventListener('pointermove', (e) => { if (drag) this.scroll = this.scrollTarget = clamp(drag.s - (e.clientX - drag.x)); });
-    const end = () => { drag = null; };
-    cv.addEventListener('pointerup', end);
-    cv.addEventListener('pointercancel', end);
+    cv.addEventListener('pointermove', (e) => {
+      if (drag) {
+        if (Math.abs(e.clientX - drag.x) > 6) drag.moved = true;
+        if (drag.moved && this.maxScroll) this.scroll = this.scrollTarget = clamp(drag.s - (e.clientX - drag.x));
+      } else cv.style.cursor = onFirst(e) ? 'pointer' : '';
+    });
+    cv.addEventListener('pointerup', (e) => { if (drag && !drag.moved && onFirst(e)) this.playStartPitch(); drag = null; });
+    cv.addEventListener('pointercancel', () => { drag = null; });
     this.el.play.addEventListener('click', () => (this.playing ? this.stopPlayback() : this.done && this.take ? this.playTake() : this.play()));
     const toggleMenu = (btn, menu) => (e) => {
       e.stopPropagation();
@@ -340,6 +324,13 @@ export class LearnUI {
     if (!take) this.reset(); // a performance replay keeps its colours
   }
 
+  /** Tap the first note: hear the starting pitch. Listening pauses while it sounds. */
+  playStartPitch() {
+    const ctx = this.audioCtx();
+    this.tones(ctx, [{ midi: this.phrase.notes[0].midi, t: ctx.currentTime + 0.03, d: 1 }], 0.25);
+    this.quietUntil = performance.now() / 1000 + 1.3;
+  }
+
   /** Help: play the note the singer should be on, then the next one. Listening pauses meanwhile. */
   hint(now) {
     const ctx = this.audioCtx(), notes = this.phrase.notes;
@@ -458,16 +449,19 @@ export class LearnUI {
   layout() {
     const { w, h } = this.surf;
     const notes = this.phrase.notes;
-    const gap = Math.max(7, Math.min(22, h / 10, w / 26));
+    // width weight: base + duration + room for an accidental + barline
+    const shown = this.accidentals();
+    const wts = notes.map((n, i) => 1 + 0.35 * (n.dur - 1) + (shown[i] != null ? 0.45 : 0) + (n.barAfter ? 0.35 : 0));
+    const sumW = wts.reduce((a, b) => a + b, 0);
+    let gap = Math.max(7, Math.min(22, h / 10, w / 26));
+    // Short (dice) phrases always fit the panel: shrink the staff rather than scroll
+    if (this.kind !== 'book') gap = Math.max(7, Math.min(gap, (w - 20) / (sumW * 2.2 + 5.2)));
     const top = h / 2 - 2 * gap; // top staff line
     const bottomD = this.phrase.clef === 'treble' ? 30 : 18; // E4 / G2 = bottom line (diatonic number)
     const yOf = (n) => top + 4 * gap - ((n.oct * 7 + LETTERS.indexOf(n.letter)) - bottomD) * gap / 2;
     const x0 = 4.2 * gap + 12, x1 = w - gap - 8; // notes start clear of the clef
-    // width weight: base + duration + room for an accidental + barline
-    const shown = this.accidentals();
-    const wts = notes.map((n, i) => 1 + 0.35 * (n.dur - 1) + (shown[i] != null ? 0.45 : 0) + (n.barAfter ? 0.35 : 0));
-    // Short phrases stretch to fit; long ones keep a readable spacing and scroll
-    const sumW = wts.reduce((a, b) => a + b, 0), avail = x1 - x0;
+    // Long phrases keep a readable spacing and scroll; short ones stretch to fill
+    const avail = x1 - x0;
     const u = sumW * gap * 2.2 <= avail ? avail / sumW : gap * 2.2;
     let x = 0;
     const xs = [], bars = [], measStart = [0], measOf = [];
@@ -588,10 +582,18 @@ export class LearnUI {
         ctx.fillText(L.shown[i] === 1 ? '♯' : L.shown[i] === -1 ? '♭' : '♮', x - gap * 0.85, y + (L.shown[i] === -1 ? -gap * 0.3 : 0));
       }
       // notehead
-      ctx.save(); ctx.translate(x, y); ctx.rotate(-0.35);
-      ctx.beginPath(); ctx.ellipse(0, 0, gap * 0.62, gap * 0.44, 0, 0, Math.PI * 2);
-      if (n.dur >= 2) { ctx.lineWidth = gap * 0.18; ctx.stroke(); } else ctx.fill();
+      ctx.save(); ctx.translate(x, y);
+      ctx.beginPath();
+      if (n.dur >= 4) { // whole note: wider, upright oval with a hole tilted the other way
+        ctx.ellipse(0, 0, gap * 0.78, gap * 0.48, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, gap * 0.42, gap * 0.26, 1.0, 0, Math.PI * 2);
+      } else {
+        ctx.ellipse(0, 0, gap * 0.62, gap * 0.44, -0.35, 0, Math.PI * 2);
+        if (n.dur >= 2) ctx.ellipse(0, 0, gap * 0.5, gap * 0.19, -0.6, 0, Math.PI * 2); // half note: hole inside the same outline
+      }
+      ctx.fill('evenodd');
       ctx.restore();
+      if (i === 0) this.firstNote = { x, y, r: gap * 1.4 };
       // stem
       if (n.dur < 4) {
         const up = y > top + 2 * gap;
