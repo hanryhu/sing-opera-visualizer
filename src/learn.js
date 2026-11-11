@@ -196,7 +196,16 @@ export class LearnUI {
     }));
     if (this.page === 1) { // Rhythm
       const R = this.rhythm;
-      const GLYPH = { 16: '\u{1D161}', 8: '\u{1D160}', q: '\u{1D15F}', h: '\u{1D15E}', w: '\u{1D15D}' };
+      // drawn note icons (the music-font characters don't render everywhere, e.g. iPhone Safari)
+      const noteHead = (filled) => `<ellipse cx="9.5" cy="18" rx="4.4" ry="3.1" transform="rotate(-22 9.5 18)" ${filled ? 'fill="currentColor"' : 'fill="none" stroke="currentColor" stroke-width="1.7"'}/>`;
+      const stem = '<path d="M13.6 17V3.5" stroke="currentColor" stroke-width="1.5"/>';
+      const flag = (y) => `<path d="M13.6 ${y}c.4 2.6 4.6 3.6 4.4 7.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>`;
+      const svg = (inner) => `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">${inner}</svg>`;
+      const GLYPH = {
+        w: svg('<ellipse cx="12" cy="14" rx="5.2" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.9"/>'),
+        h: svg(noteHead(false) + stem), q: svg(noteHead(true) + stem),
+        8: svg(noteHead(true) + stem + flag(3.5)), 16: svg(noteHead(true) + stem + flag(3.5) + flag(7.5)),
+      };
       const NAME = { 16: 'Sixteenth', 8: 'Eighth', q: 'Quarter', h: 'Half', w: 'Whole' };
       this.el.rerollMenu.innerHTML = head +
         `<div class="nv-grid">${NOTE_VALUES.map((v) => `<button type="button" class="iv-chip nv-chip" data-nv="${v}" aria-pressed="${R.values.includes(v)}" title="${t(NAME[v])}" aria-label="${t(NAME[v])}">${GLYPH[v]}</button>`).join('')}</div>` +
