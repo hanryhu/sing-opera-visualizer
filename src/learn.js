@@ -1397,18 +1397,26 @@ export class LearnUI {
         }
       });
       if (a.pc.tup) {
-        ctx.font = `italic 700 ${gap * 1.25}px "Noto Serif", Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillStyle = C.text;
-        const cx = (a.stemX + z.stemX) / 2;
-        ctx.fillText('3', cx, beamY(cx) + dir * gap * 1.1);
+        // with words under the staff, a triplet's number goes above (below would sit on the lyrics)
+        if (this.phrase.lang && !up) gr.tupAbove = true;
+        else {
+          ctx.font = `italic 700 ${gap * 1.25}px "Noto Serif", Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillStyle = C.text;
+          const cx = (a.stemX + z.stemX) / 2;
+          ctx.fillText('3', cx, beamY(cx) + dir * gap * 1.1);
+        }
       }
     }
     // triplets that aren't beamed (quarter-note triplets): a bracket with 3
     const tups = {};
-    for (const hd of L.heads) if (hd.pc.tup && hd.vis && !(hd.group && hd.group.items.length > 1)) (tups[hd.pc.tup] ||= []).push(hd);
+    for (const hd of L.heads) if (hd.pc.tup && hd.vis && !(hd.group && hd.group.items.length > 1 && !hd.group.tupAbove)) (tups[hd.pc.tup] ||= []).push(hd);
     for (const list of Object.values(tups)) {
-      const a = list[0], z = list[list.length - 1], up = (a.up ?? true);
-      const y = (up ? Math.min(...list.map((h) => h.y)) - 4.2 * gap : Math.max(...list.map((h) => h.y)) + 4.2 * gap);
+      const a = list[0], z = list[list.length - 1];
+      const up = this.phrase.lang ? true : (a.up ?? true); // above the staff when there are words
+      // clear of the notes, of stems that point up, and (above) of the staff itself
+      const y = up
+        ? Math.min(top - gap * 1.2, ...list.map((h) => (h.up ? h.y - 3.9 * gap : h.y - 1.4 * gap)))
+        : Math.max(...list.map((h) => h.y)) + 4.2 * gap;
       ctx.strokeStyle = C.text; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(a.sx - gap * 0.6, y + (up ? gap * 0.5 : -gap * 0.5)); ctx.lineTo(a.sx - gap * 0.6, y); ctx.lineTo(z.sx + gap * 0.6, y); ctx.lineTo(z.sx + gap * 0.6, y + (up ? gap * 0.5 : -gap * 0.5)); ctx.stroke();
       ctx.fillStyle = '#12151c'; ctx.fillRect((a.sx + z.sx) / 2 - gap * 0.6, y - gap * 0.6, gap * 1.2, gap * 1.2);
