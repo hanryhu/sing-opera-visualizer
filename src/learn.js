@@ -136,7 +136,7 @@ export class LearnUI {
       panel: $('learnPanel'), canvas: $('learnCanvas'), retry: $('learnRetry'), reroll: $('learnReroll'),
       rerollMenuBtn: $('learnRerollMenu'), rerollMenu: $('learnIntervals'), play: $('learnPlay'),
       score: $('learnScore'),
-      help: $('learnHelp'), perf: $('learnPerf'), edit: $('learnEdit'), undo: $('learnUndo'),
+      help: $('learnHelp'), rec: $('learnRec'), edit: $('learnEdit'), undo: $('learnUndo'),
       keyboard: $('keyboard'), keyboardWrap: $('keyboardWrap'), keyLens: $('keyLens'),
       rhythmBtn: $('rhythmBtn'), rhythmPop: $('rhythmPop'), tsBtn: $('tsBtn'), tsPop: $('tsPop'), keyUp: $('keyUp'), keyDown: $('keyDown'), keyDel: $('keyDel'), barAdd: $('barAdd'), barDel: $('barDel'), keyClear: $('keyClear'),
     };
@@ -179,9 +179,9 @@ export class LearnUI {
       this.helpOn = !this.helpOn;
       this.el.help.setAttribute('aria-pressed', String(this.helpOn));
       try { localStorage.setItem('va.learn.help', this.helpOn ? '1' : '0'); } catch { /* ignore */ }
+      if (this.helpOn) this.cancelPerformance(); // Assist: no recording while hints may play
     });
     // Performance (one take): press before singing; recording stops after the last note, then plays back
-    this.el.perf.addEventListener('click', () => (this.perf ? this.cancelPerformance() : this.armPerformance()));
     this.el.reroll.addEventListener('click', () => this.reroll());
     // Long phrases scroll: wheel or drag freely; the view also turns a page as the singer nears the edge
     const cv = this.el.canvas, clamp = (v) => Math.max(0, Math.min(this.maxScroll || 0, v));
@@ -392,6 +392,7 @@ export class LearnUI {
 
   reset() {
     this.idx = 0; this.started = false; this.done = false; this.octShift = null;
+    this.cancelPerformance?.();
     this.cents = []; this.ratings = []; this.live = null; this.take = null;
     this.noteT = 0; this.nextSince = null; this.silentSince = null;
     this.wrongSince = null; this.offSince = null; this.hintedIdx = -1;
@@ -427,6 +428,8 @@ export class LearnUI {
     if (!this.isOpen || !this.phrase) return;
     const notes = this.phrase.notes;
     if (this.editing || !notes.length) { this.draw(now); return; } // writing: nothing to follow
+    // Recording is the default: arm it before each attempt (not with Assist, not while sound plays)
+    if (!this.helpOn && !this.perf && !this.started && !this.done && !this.playing) this.startRecording();
     const quiet = this.playing || now < (this.quietUntil || 0); // ignore the speaker during playback
     if (!quiet && !this.done && o?.voiced && o.midiFast) {
       this.silentSince = null;
@@ -703,13 +706,13 @@ export class LearnUI {
   }
 
   /* ---------------- performance: record one take, then play it back with the right notes ---------------- */
-  async armPerformance() {
-    this.stopPlayback();
-    this.reset();
+  async armPerformance() { this.stopPlayback(); this.reset(); return this.startRecording(); }
+
+  /** Record this attempt (from now; the take is trimmed to the first note). Runs on its own unless Assist is on. */
+  async startRecording() {
     const ctx = this.h.getCtx(), tap = this.h.getTap?.();
     if (!ctx || !tap) return;
     this.perf = { chunks: [], onsets: [], t0: null, ctx };
-    this.el.perf.setAttribute('aria-pressed', 'true');
     try {
       if (this.recCtx !== ctx) {
         await ctx.audioWorklet.addModule('src/rec-worklet.js');
@@ -721,6 +724,7 @@ export class LearnUI {
     } catch { this.cancelPerformance(); return; }
     if (!this.perf) return;
     this.perf.t0 = ctx.currentTime;
+    this.el.rec.hidden = false;
     this.recNode.port.onmessage = (e) => {
       const P = this.perf;
       if (!P || P.stopped) return;
@@ -732,7 +736,7 @@ export class LearnUI {
   cancelPerformance() {
     if (this.recNode) this.recNode.port.onmessage = null;
     this.perf = null;
-    this.el.perf.setAttribute('aria-pressed', 'false');
+    this.el.rec.hidden = true;
   }
 
   /** Note onset in recording time (the follower hears a note ~ONSET_LAG after it starts). */

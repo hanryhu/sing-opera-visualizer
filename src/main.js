@@ -477,12 +477,11 @@ function applyLayout() {
       dash.style.gridTemplateAreas = areas.join(' ');
       return;
     }
-    if (mobile) { // compact, to fit one screen
-      add('170px', '"learn learn"');
-      add(c('pitch') ? H : '120px', '"tuner tuner"');
-      add(c('f3') && c('vowel') ? H : '210px', '"f3 map"');
-      add(c('input') ? H : view.detail ? '84px' : '56px', '"meter meter"');
-      dash.style.gridTemplateColumns = '';
+    if (mobile) { // compact, to fit one screen: Input is a thin vertical bar beside the vowel chart
+      add('170px', '"learn learn learn"');
+      add(c('pitch') ? H : '120px', '"tuner tuner tuner"');
+      add(c('f3') && c('vowel') && c('input') ? H : '272px', '"f3 map meter"');
+      dash.style.gridTemplateColumns = `${c('f3') ? H : '74px'} minmax(0, 1fr) ${c('input') ? H : '40px'}`;
     } else {
       add('minmax(0, 1.15fr)', '"learn learn learn meter"');
       add(c('pitch') && c('vowel') && c('f3') ? H : grow, '"tuner map f3 meter"');

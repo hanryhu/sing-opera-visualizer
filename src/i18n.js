@@ -17,7 +17,7 @@ const ZH = {
   'Time signature changes': '变换拍号', 'Bars': '小节',
   'Write your own phrase': '自己写乐句', 'Done': '完成', 'Undo': '撤销', 'Delete': '删除', 'Note length': '音符时值',
   'Raise a semitone (sharps)': '升高半音（升号）', 'Lower a semitone (flats)': '降低半音（降号）',
-  'Add a bar': '添加一小节', 'Remove the last bar': '删除最后一小节', '+Bar': '+小节', '−Bar': '−小节', 'Time signature': '拍号', 'Hide the header': '隐藏顶栏', 'Show the header': '显示顶栏', 'Clear': '清空', 'Clear all': '全部清空', 'Dotted half': '附点二分音符', 'Dotted quarter': '附点四分音符', 'Dotted eighth': '附点八分音符', 'Language': '歌词', 'No words': '无歌词',
+  'Add a bar': '添加一小节', 'Remove the last bar': '删除最后一小节', '+Bar': '+小节', '−Bar': '−小节', 'Time signature': '拍号', 'Hide the header': '隐藏顶栏', 'Assist': '辅助', 'Assist: play the right note when you go wrong (attempts are not recorded)': '辅助：唱错时播放正确的音（不录音）', 'Show the header': '显示顶栏', 'Clear': '清空', 'Clear all': '全部清空', 'Dotted half': '附点二分音符', 'Dotted quarter': '附点四分音符', 'Dotted eighth': '附点八分音符', 'Language': '歌词', 'No words': '无歌词',
   'Atonal': '无调性', 'Tonal': '调性', 'Pentatonic': '五声音阶', 'Diatonic': '自然音阶', 'Blues': '布鲁斯', 'Chromatic': '半音化', 'Modern': '现代',
   'Analyze your voice from the microphone': '通过麦克风分析你的声音',
   'Hear a synthesized voice with your own F0, F1, F2, F3 and volume': '用你设定的 F0、F1、F2、F3 和音量播放合成人声',

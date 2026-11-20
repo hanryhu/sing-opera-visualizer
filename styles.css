@@ -126,7 +126,9 @@ body.header-hidden .header-tab { display: block; }
 .panel.learn { overflow: visible; z-index: 5; } /* its menus may hang below the panel */
 #learnCanvas { touch-action: pan-y; } /* horizontal drags scroll the staff; vertical ones scroll the page */
 @media (min-width: 761px) { body.learn-on .panel.collapsed:not(.learn) .panel-label { writing-mode: vertical-rl; left: 9px; } }
-body:not(.learn-on) #learnHelp { display: none; } /* Pitch hints: a Learn setting */
+/* recording indicator beside the Learn title */
+.rec-ind { width: 8px; height: 8px; border-radius: 50%; background: var(--red); animation: pulse 1.6s infinite; margin-left: 2px; }
+.rec-ind[hidden] { display: none; }
 /* Learn on a phone: compact panels so everything fits one screen; pitch readout beside its trace */
 @media (max-width: 760px) {
   body.learn-on .tuner { grid-template-columns: 104px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
@@ -137,12 +139,13 @@ body:not(.learn-on) #learnHelp { display: none; } /* Pitch hints: a Learn settin
   body.learn-on .tuner .gauge { height: 26px; margin-top: 2px; }
   body.learn-on .vib-wrap { display: none; }
   body.learn-on .dashboard { padding-top: 8px; gap: 8px; }
+  body.learn-on:not(.learn-edit) .meter .panel-label { font-size: 0; left: 8px; } /* a thin vertical Input bar: chevron only */
 }
 /* Writing a phrase: the keyboard panel replaces Pitch / vowel / F3; the toolbar keeps Play, Undo and the pencil */
 .keys { grid-area: keys; display: none; flex-direction: column; padding: 8px 10px 10px; gap: 8px; }
 body.learn-edit .keys { display: flex; }
 body.learn-edit .tuner, body.learn-edit .f3, body.learn-edit .vowels { display: none; }
-body.learn-edit #learnRetry, body.learn-edit #learnPerf, body.learn-edit .split-btn, body.learn-edit #learnScore { display: none; }
+body.learn-edit #learnRetry, body.learn-edit #learnHelp, body.learn-edit .split-btn, body.learn-edit #learnScore { display: none; }
 body:not(.learn-edit) #learnUndo { display: none; }
 #learnUndo:disabled { opacity: .35; cursor: default; }
 .keys-tools { position: relative; display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
