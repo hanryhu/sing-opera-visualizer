@@ -126,7 +126,7 @@ export class LearnUI {
       score: $('learnScore'),
       help: $('learnHelp'), perf: $('learnPerf'), edit: $('learnEdit'), undo: $('learnUndo'),
       keyboard: $('keyboard'), keyboardWrap: $('keyboardWrap'), keyLens: $('keyLens'), keyDot: $('keyDot'),
-      keyUp: $('keyUp'), keyDown: $('keyDown'), keyDel: $('keyDel'), barAdd: $('barAdd'), barDel: $('barDel'),
+      keyUp: $('keyUp'), keyDown: $('keyDown'), keyDel: $('keyDel'), barAdd: $('barAdd'), barDel: $('barDel'), keyClear: $('keyClear'),
     };
     this.surf = new Surface(this.el.canvas);
     let saved = null;
@@ -857,6 +857,11 @@ export class LearnUI {
     });
   }
 
+  /** Clear: start again from one empty bar (Undo brings everything back). */
+  clearAll() {
+    this.edit((N) => { N.length = 0; N.push({ rest: true, dur: this.barLen() }); this.sel = 0; });
+  }
+
   /** − Bar: remove the last bar (a note held into it is cut at the barline). */
   removeBar() {
     const total = this.score.notes.reduce((a, n) => a + n.dur, 0);
@@ -995,6 +1000,7 @@ export class LearnUI {
       this.el.keyLens.querySelectorAll('[data-len]').forEach((b) => b.addEventListener('click', () => this.setLength(Number(b.dataset.len))));
       this.el.barAdd.addEventListener('click', () => this.addBar());
       this.el.barDel.addEventListener('click', () => this.removeBar());
+      this.el.keyClear.addEventListener('click', () => this.clearAll());
       this.el.keyDot.addEventListener('click', () => this.setLength(this.editLen || 1, !this.editDot));
       this.el.keyUp.addEventListener('click', () => this.nudge(1));
       this.el.keyDown.addEventListener('click', () => this.nudge(-1));
@@ -1011,6 +1017,7 @@ export class LearnUI {
     [this.el.keyUp, this.el.keyDown].forEach((b) => { b.disabled = !selNote; });
     this.el.keyDel.disabled = !selItem;
     this.el.barDel.disabled = !this.score?.notes.length;
+    this.el.keyClear.disabled = !this.score?.notes.some((n) => !n.rest);
     this.el.undo.disabled = !this.undoStack?.length;
     kb.querySelectorAll('.key.on').forEach((k) => k.classList.remove('on'));
     if (selNote) kb.querySelector(`[data-midi="${selNote.midi}"]`)?.classList.add('on');
