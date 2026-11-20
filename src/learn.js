@@ -397,7 +397,7 @@ export class LearnUI {
     this.noteT = 0; this.nextSince = null; this.silentSince = null;
     this.wrongSince = null; this.offSince = null; this.hintedIdx = -1;
     this.barX = null;
-    this.scroll = 0; this.scrollTarget = 0; this.turnM = 0;
+    this.scroll = 0; this.scrollTarget = 0; this.turnM = 0; this.lastTurnIdx = -1;
     this.el.score.textContent = '';
   }
 
@@ -1214,6 +1214,15 @@ export class LearnUI {
       const nextEnd = L.measStart[bar + 2] ?? L.contentW;
       if (nextEnd > this.scrollTarget + L.avail || L.measStart[bar] < this.scrollTarget) {
         this.scrollTarget = Math.max(0, Math.min(this.maxScroll, L.measStart[bar]));
+      }
+    }
+    // Within a bar wider than the screen: once the next note isn't fully in view (or this one is off to the
+    // left), move on so this note sits near the left edge — a turn every part of a bar instead of a whole bar.
+    if (!this.editing && this.lastTurnIdx !== this.curIdx && xs[this.curIdx] != null) {
+      this.lastTurnIdx = this.curIdx;
+      const cur = xs[this.curIdx], next = xs[this.curIdx + 1] ?? L.contentW;
+      if (next + gap * 1.5 > this.scrollTarget + L.avail || cur < this.scrollTarget) {
+        this.scrollTarget = Math.max(0, Math.min(this.maxScroll, cur - gap * 2));
       }
     }
     this.scrollTarget = Math.min(this.scrollTarget, this.maxScroll);
