@@ -135,10 +135,11 @@ body:not(.learn-edit) #learnUndo { display: none; }
 .rhythm-pick { flex: none; }
 .rhythm-btn { width: 46px; gap: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }
 .rhythm-btn svg:first-child { width: 22px; height: 22px; }
-.rhythm-pop { position: absolute; inset: 0; z-index: 4; display: flex; align-items: center; gap: 6px; background: var(--panel); }
+.rhythm-pop { position: absolute; inset: 0; z-index: 4; display: flex; align-items: center; gap: 4px; background: var(--panel); }
 .rhythm-pop[hidden] { display: none; }
 .key-lens { display: flex; gap: 4px; }
-.key-lens .nv-chip { width: 38px; height: 36px; }
+.key-lens { flex: none; gap: 4px; }
+.key-lens .nv-chip { flex: none; width: 36px; height: 36px; }
 .key-btn { flex: none; min-width: 32px; height: 36px; padding: 0 6px; display: inline-grid; place-items: center; font-size: 15px; }
 .key-btn:disabled { opacity: .35; cursor: default; }
 .bar-btn { font: 600 14px var(--ui); }

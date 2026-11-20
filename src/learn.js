@@ -70,11 +70,15 @@ const noteHead = (filled) => `<ellipse cx="9.5" cy="18" rx="4.4" ry="3.1" transf
 const STEM = '<path d="M13.6 17V3.5" stroke="currentColor" stroke-width="1.5"/>';
 const flagSvg = (y) => `<path d="M13.6 ${y}c.4 2.6 4.6 3.6 4.4 7.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>`;
 const iconSvg = (inner) => `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">${inner}</svg>`;
-const NOTE_ICON = {
-  w: iconSvg('<ellipse cx="12" cy="14" rx="5.2" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.9"/>'),
-  h: iconSvg(noteHead(false) + STEM), q: iconSvg(noteHead(true) + STEM),
-  8: iconSvg(noteHead(true) + STEM + flagSvg(3.5)), 16: iconSvg(noteHead(true) + STEM + flagSvg(3.5) + flagSvg(7.5)),
+const NOTE_INNER = {
+  w: '<ellipse cx="12" cy="14" rx="5.2" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.9"/>',
+  h: noteHead(false) + STEM, q: noteHead(true) + STEM,
+  8: noteHead(true) + STEM + flagSvg(3.5), 16: noteHead(true) + STEM + flagSvg(3.5) + flagSvg(7.5),
 };
+const NOTE_ICON = Object.fromEntries(Object.entries(NOTE_INNER).map(([k, v]) => [k, iconSvg(v)]));
+/** A length (quarters) as one icon: the note, with its dot when dotted. */
+const LEN_BASE = { 4: 'w', 3: 'h', 2: 'h', 1.5: 'q', 1: 'q', 0.75: '8', 0.5: '8', 0.25: '16' };
+const lenIcon = (d) => iconSvg(NOTE_INNER[LEN_BASE[d]] + ([3, 1.5, 0.75].includes(d) ? `<circle cx="${LEN_BASE[d] === '8' ? 21.5 : 18.6}" cy="17.5" r="1.7" fill="currentColor"/>` : ''));
 
 /** Rests, drawn on the staff (top = top line, gap = space). */
 function drawRest(ctx, base, dots, x, top, gap) {
@@ -125,7 +129,7 @@ export class LearnUI {
       rerollMenuBtn: $('learnRerollMenu'), rerollMenu: $('learnIntervals'), play: $('learnPlay'),
       score: $('learnScore'),
       help: $('learnHelp'), perf: $('learnPerf'), edit: $('learnEdit'), undo: $('learnUndo'),
-      keyboard: $('keyboard'), keyboardWrap: $('keyboardWrap'), keyLens: $('keyLens'), keyDot: $('keyDot'),
+      keyboard: $('keyboard'), keyboardWrap: $('keyboardWrap'), keyLens: $('keyLens'),
       rhythmBtn: $('rhythmBtn'), rhythmPop: $('rhythmPop'), keyUp: $('keyUp'), keyDown: $('keyDown'), keyDel: $('keyDel'), barAdd: $('barAdd'), barDel: $('barDel'), keyClear: $('keyClear'),
     };
     this.surf = new Surface(this.el.canvas);
@@ -157,7 +161,7 @@ export class LearnUI {
 
     this.el.retry.addEventListener('click', () => { this.stopPlayback(); this.reset(); });
     // Write your own phrase: the pencil switches the staff into editing; Undo steps back
-    this.editing = false; this.sel = -1; this.undoStack = []; this.editLen = 1; this.editDot = false;
+    this.editing = false; this.sel = -1; this.undoStack = []; this.editLen = 1; // quarter by default
     this.el.edit.addEventListener('click', () => this.toggleEdit());
     this.el.undo.addEventListener('click', () => this.undo());
     // Help (toggle): when the singer goes wrong, play the right note and the next one
@@ -891,7 +895,8 @@ export class LearnUI {
       this.stopPlayback(); this.cancelPerformance(); this.closeMenus();
       this.score = this.scoreFromPhrase();
       this.undoStack = [];
-      this.sel = this.score.notes.length - 1;
+      this.sel = -1; // nothing selected: new notes go at the end
+      this.editLen = 1;
       this.editing = true;
     } else {
       this.editing = false;
@@ -966,11 +971,11 @@ export class LearnUI {
     this.el.rhythmBtn.setAttribute('aria-expanded', String(open));
   }
 
-  editDur() { return (this.editLen || 1) * (this.editDot ? 1.5 : 1); }
+  editDur() { return this.editLen || 1; } // a length in quarters (dotted lengths are their own choices)
 
   /** Length and dot buttons: set the length for new notes, and change the selected note's length. */
-  setLength(len, dot = this.editDot) {
-    this.editLen = len; this.editDot = dot && len !== 4 && len !== 0.25; // no dotted whole or sixteenth here
+  setLength(len) {
+    this.editLen = len;
     if (this.sel >= 0 && !this.score.notes[this.sel].rest) this.edit((N) => { N[this.sel].dur = this.editDur(); });
     else this.renderKeys();
   }
@@ -1001,7 +1006,8 @@ export class LearnUI {
         kb.appendChild(k);
       }
       kb.style.width = `${x * 36}px`;
-      this.el.keyLens.innerHTML = [4, 2, 1, 0.5, 0.25].map((l) => `<button type="button" class="iv-chip nv-chip" data-len="${l}" title="${t({ 4: 'Whole', 2: 'Half', 1: 'Quarter', 0.5: 'Eighth', 0.25: 'Sixteenth' }[l])}">${NOTE_ICON[{ 4: 'w', 2: 'h', 1: 'q', 0.5: '8', 0.25: '16' }[l]]}</button>`).join('');
+      const NAMES = { 4: 'Whole', 3: 'Dotted half', 2: 'Half', 1.5: 'Dotted quarter', 1: 'Quarter', 0.75: 'Dotted eighth', 0.5: 'Eighth', 0.25: 'Sixteenth' };
+      this.el.keyLens.innerHTML = [4, 3, 2, 1.5, 1, 0.75, 0.5, 0.25].map((l) => `<button type="button" class="iv-chip nv-chip" data-len="${l}" title="${t(NAMES[l])}" aria-label="${t(NAMES[l])}">${lenIcon(l)}</button>`).join('');
       this.el.keyLens.querySelectorAll('[data-len]').forEach((b) => b.addEventListener('click', () => this.setLength(Number(b.dataset.len))));
       this.el.barAdd.addEventListener('click', () => this.addBar());
       this.el.barDel.addEventListener('click', () => this.removeBar());
@@ -1009,7 +1015,6 @@ export class LearnUI {
       // Rhythm: open the length choices over the toolbar; any tap elsewhere closes them
       this.el.rhythmBtn.addEventListener('click', (e) => { e.stopPropagation(); this.showRhythm(this.el.rhythmPop.hidden); });
       document.addEventListener('pointerdown', (e) => { if (!this.el.rhythmPop.hidden && !e.target.closest('.rhythm-pick')) this.showRhythm(false); });
-      this.el.keyDot.addEventListener('click', () => this.setLength(this.editLen || 1, !this.editDot));
       this.el.keyUp.addEventListener('click', () => this.nudge(1));
       this.el.keyDown.addEventListener('click', () => this.nudge(-1));
       this.el.keyDel.addEventListener('click', () => this.deleteNote());
@@ -1018,13 +1023,11 @@ export class LearnUI {
     const selNote = selItem && !selItem.rest ? selItem : null;
     if (selNote) { // the selected note shows its own length
       const base = [4, 2, 1, 0.5, 0.25].find((l) => Math.abs(selNote.dur - l) < 1e-6 || Math.abs(selNote.dur - l * 1.5) < 1e-6);
-      if (base) { this.editLen = base; this.editDot = Math.abs(selNote.dur - base * 1.5) < 1e-6; }
+      if (LEN_BASE[selNote.dur]) this.editLen = selNote.dur;
     }
     this.el.keyLens.querySelectorAll('[data-len]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.len) === (this.editLen || 1))));
-    this.el.keyDot.setAttribute('aria-pressed', String(!!this.editDot));
     // the closed Rhythm button shows the length in use (and its dot)
-    const base = { 4: 'w', 2: 'h', 1: 'q', 0.5: '8', 0.25: '16' }[this.editLen || 1];
-    this.el.rhythmBtn.innerHTML = NOTE_ICON[base] + (this.editDot ? '<svg viewBox="0 0 8 24" width="7" height="22" aria-hidden="true"><circle cx="3" cy="17" r="2.2" fill="currentColor"/></svg>' : '');
+    this.el.rhythmBtn.innerHTML = lenIcon(this.editLen || 1);
     [this.el.keyUp, this.el.keyDown].forEach((b) => { b.disabled = !selNote; });
     this.el.keyDel.disabled = !selItem;
     this.el.barDel.disabled = !this.score?.notes.length;
