@@ -33,10 +33,12 @@ body {
 
 /* ---------- top bar ---------- */
 body.header-hidden .topbar { display: none; }
-.header-tab { display: none; position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 40; width: 46px; height: 18px;
-  padding: 0; border: 1px solid var(--line-strong); border-top: 0; border-radius: 0 0 10px 10px; background: var(--panel-2); color: var(--muted); cursor: pointer; }
+/* with the header hidden, a slim strip above the panels brings it back (in the flow: it covers nothing) */
+.header-tab { display: none; flex: none; width: 100%; height: 16px; padding: 0; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--faint); cursor: pointer; }
+.header-tab:hover { color: var(--text); background: var(--line); }
 .header-tab svg { display: block; margin: 0 auto; }
 body.header-hidden .header-tab { display: block; }
+body.header-hidden .dashboard { padding-top: 6px; }
 .topbar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 12px 20px; border-bottom: 1px solid var(--line);
@@ -139,6 +141,7 @@ body.header-hidden .header-tab { display: block; }
   body.learn-on .tuner .gauge { height: 26px; margin-top: 2px; }
   body.learn-on .vib-wrap { display: none; }
   body.learn-on .dashboard { padding-top: 8px; gap: 8px; }
+  body.learn-on.header-hidden .dashboard { padding-top: 6px; }
   body.learn-on:not(.learn-edit) .meter .panel-label { font-size: 0; left: 8px; } /* a thin vertical Input bar: chevron only */
 }
 /* Writing a phrase: the keyboard panel replaces Pitch / vowel / F3; the toolbar keeps Play, Undo and the pencil */
