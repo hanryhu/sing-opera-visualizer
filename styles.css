@@ -140,6 +140,8 @@ body:not(.learn-edit) #learnUndo { display: none; }
 .key-lens { display: flex; gap: 4px; }
 .key-lens { flex: none; gap: 4px; }
 .key-lens .nv-chip { flex: none; width: 36px; height: 36px; }
+.key-lens [data-dot] { margin-left: 6px; }
+.key-lens .nv-chip:disabled { opacity: .35; cursor: default; }
 .key-btn { flex: none; min-width: 32px; height: 36px; padding: 0 6px; display: inline-grid; place-items: center; font-size: 15px; }
 .key-btn:disabled { opacity: .35; cursor: default; }
 .bar-btn { font: 600 14px var(--ui); }

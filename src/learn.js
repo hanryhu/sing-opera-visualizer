@@ -161,7 +161,7 @@ export class LearnUI {
 
     this.el.retry.addEventListener('click', () => { this.stopPlayback(); this.reset(); });
     // Write your own phrase: the pencil switches the staff into editing; Undo steps back
-    this.editing = false; this.sel = -1; this.undoStack = []; this.editLen = 1; // quarter by default
+    this.editing = false; this.sel = -1; this.undoStack = []; this.editLen = 1; this.editDot = false; // quarter by default
     this.el.edit.addEventListener('click', () => this.toggleEdit());
     this.el.undo.addEventListener('click', () => this.undo());
     // Help (toggle): when the singer goes wrong, play the right note and the next one
@@ -896,7 +896,7 @@ export class LearnUI {
       this.score = this.scoreFromPhrase();
       this.undoStack = [];
       this.sel = -1; // nothing selected: new notes go at the end
-      this.editLen = 1;
+      this.editLen = 1; this.editDot = false;
       this.editing = true;
     } else {
       this.editing = false;
@@ -971,11 +971,13 @@ export class LearnUI {
     this.el.rhythmBtn.setAttribute('aria-expanded', String(open));
   }
 
-  editDur() { return this.editLen || 1; } // a length in quarters (dotted lengths are their own choices)
+  editDur() { return (this.editLen || 1) * (this.editDot ? 1.5 : 1); } // in quarters
 
   /** Length and dot buttons: set the length for new notes, and change the selected note's length. */
-  setLength(len) {
+  /** Length boxes and the dot box (picking); the closed Rhythm button shows the result as one icon. */
+  setLength(len, dot = this.editDot) {
     this.editLen = len;
+    this.editDot = dot && len !== 4 && len !== 0.25; // dotted half, quarter and eighth
     if (this.sel >= 0 && !this.score.notes[this.sel].rest) this.edit((N) => { N[this.sel].dur = this.editDur(); });
     else this.renderKeys();
   }
@@ -1006,9 +1008,11 @@ export class LearnUI {
         kb.appendChild(k);
       }
       kb.style.width = `${x * 36}px`;
-      const NAMES = { 4: 'Whole', 3: 'Dotted half', 2: 'Half', 1.5: 'Dotted quarter', 1: 'Quarter', 0.75: 'Dotted eighth', 0.5: 'Eighth', 0.25: 'Sixteenth' };
-      this.el.keyLens.innerHTML = [4, 3, 2, 1.5, 1, 0.75, 0.5, 0.25].map((l) => `<button type="button" class="iv-chip nv-chip" data-len="${l}" title="${t(NAMES[l])}" aria-label="${t(NAMES[l])}">${lenIcon(l)}</button>`).join('');
+      const NAMES = { 4: 'Whole', 2: 'Half', 1: 'Quarter', 0.5: 'Eighth', 0.25: 'Sixteenth' };
+      this.el.keyLens.innerHTML = [4, 2, 1, 0.5, 0.25].map((l) => `<button type="button" class="iv-chip nv-chip" data-len="${l}" title="${t(NAMES[l])}" aria-label="${t(NAMES[l])}">${lenIcon(l)}</button>`).join('') +
+        `<button type="button" class="iv-chip nv-chip" data-dot title="${t('Dotted')}" aria-label="${t('Dotted')}"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="currentColor"/></svg></button>`;
       this.el.keyLens.querySelectorAll('[data-len]').forEach((b) => b.addEventListener('click', () => this.setLength(Number(b.dataset.len))));
+      this.el.keyLens.querySelector('[data-dot]').addEventListener('click', () => this.setLength(this.editLen || 1, !this.editDot));
       this.el.barAdd.addEventListener('click', () => this.addBar());
       this.el.barDel.addEventListener('click', () => this.removeBar());
       this.el.keyClear.addEventListener('click', () => this.clearAll());
@@ -1023,11 +1027,14 @@ export class LearnUI {
     const selNote = selItem && !selItem.rest ? selItem : null;
     if (selNote) { // the selected note shows its own length
       const base = [4, 2, 1, 0.5, 0.25].find((l) => Math.abs(selNote.dur - l) < 1e-6 || Math.abs(selNote.dur - l * 1.5) < 1e-6);
-      if (LEN_BASE[selNote.dur]) this.editLen = selNote.dur;
+      if (base) { this.editLen = base; this.editDot = Math.abs(selNote.dur - base * 1.5) < 1e-6; }
     }
     this.el.keyLens.querySelectorAll('[data-len]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.len) === (this.editLen || 1))));
+    const dotBtn = this.el.keyLens.querySelector('[data-dot]');
+    dotBtn.setAttribute('aria-pressed', String(!!this.editDot));
+    dotBtn.disabled = this.editLen === 4 || this.editLen === 0.25;
     // the closed Rhythm button shows the length in use (and its dot)
-    this.el.rhythmBtn.innerHTML = lenIcon(this.editLen || 1);
+    this.el.rhythmBtn.innerHTML = lenIcon(this.editDur()); // one icon: the note with its dot
     [this.el.keyUp, this.el.keyDown].forEach((b) => { b.disabled = !selNote; });
     this.el.keyDel.disabled = !selItem;
     this.el.barDel.disabled = !this.score?.notes.length;
