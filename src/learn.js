@@ -126,7 +126,7 @@ export class LearnUI {
       score: $('learnScore'),
       help: $('learnHelp'), perf: $('learnPerf'), edit: $('learnEdit'), undo: $('learnUndo'),
       keyboard: $('keyboard'), keyboardWrap: $('keyboardWrap'), keyLens: $('keyLens'), keyDot: $('keyDot'),
-      keyUp: $('keyUp'), keyDown: $('keyDown'), keyDel: $('keyDel'), barAdd: $('barAdd'), barDel: $('barDel'), keyClear: $('keyClear'),
+      rhythmBtn: $('rhythmBtn'), rhythmPop: $('rhythmPop'), keyUp: $('keyUp'), keyDown: $('keyDown'), keyDel: $('keyDel'), barAdd: $('barAdd'), barDel: $('barDel'), keyClear: $('keyClear'),
     };
     this.surf = new Surface(this.el.canvas);
     let saved = null;
@@ -961,6 +961,11 @@ export class LearnUI {
     this.edit((N) => { N.splice(this.sel, 1); this.sel = Math.min(this.sel, N.length - 1); });
   }
 
+  showRhythm(open) {
+    this.el.rhythmPop.hidden = !open;
+    this.el.rhythmBtn.setAttribute('aria-expanded', String(open));
+  }
+
   editDur() { return (this.editLen || 1) * (this.editDot ? 1.5 : 1); }
 
   /** Length and dot buttons: set the length for new notes, and change the selected note's length. */
@@ -1001,6 +1006,9 @@ export class LearnUI {
       this.el.barAdd.addEventListener('click', () => this.addBar());
       this.el.barDel.addEventListener('click', () => this.removeBar());
       this.el.keyClear.addEventListener('click', () => this.clearAll());
+      // Rhythm: open the length choices over the toolbar; any tap elsewhere closes them
+      this.el.rhythmBtn.addEventListener('click', (e) => { e.stopPropagation(); this.showRhythm(this.el.rhythmPop.hidden); });
+      document.addEventListener('pointerdown', (e) => { if (!this.el.rhythmPop.hidden && !e.target.closest('.rhythm-pick')) this.showRhythm(false); });
       this.el.keyDot.addEventListener('click', () => this.setLength(this.editLen || 1, !this.editDot));
       this.el.keyUp.addEventListener('click', () => this.nudge(1));
       this.el.keyDown.addEventListener('click', () => this.nudge(-1));
@@ -1014,6 +1022,9 @@ export class LearnUI {
     }
     this.el.keyLens.querySelectorAll('[data-len]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.len) === (this.editLen || 1))));
     this.el.keyDot.setAttribute('aria-pressed', String(!!this.editDot));
+    // the closed Rhythm button shows the length in use (and its dot)
+    const base = { 4: 'w', 2: 'h', 1: 'q', 0.5: '8', 0.25: '16' }[this.editLen || 1];
+    this.el.rhythmBtn.innerHTML = NOTE_ICON[base] + (this.editDot ? '<svg viewBox="0 0 8 24" width="7" height="22" aria-hidden="true"><circle cx="3" cy="17" r="2.2" fill="currentColor"/></svg>' : '');
     [this.el.keyUp, this.el.keyDown].forEach((b) => { b.disabled = !selNote; });
     this.el.keyDel.disabled = !selItem;
     this.el.barDel.disabled = !this.score?.notes.length;
