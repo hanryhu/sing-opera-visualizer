@@ -76,15 +76,19 @@
             <div id="keyLens" class="key-lens" aria-label="Note length"></div>
           </div>
         </div>
+        <div class="rhythm-pick ts-pick">
+          <button type="button" id="tsBtn" class="iv-chip key-btn ts-btn" aria-expanded="false" title="Time signature" aria-label="Time signature"></button>
+          <div id="tsPop" class="rhythm-pop ts-pop" hidden></div>
+        </div>
         <span class="key-sep"></span>
         <button type="button" id="keyUp" class="iv-chip key-btn" title="Raise a semitone (sharps)" aria-label="Raise a semitone (sharps)">▲</button>
         <button type="button" id="keyDown" class="iv-chip key-btn" title="Lower a semitone (flats)" aria-label="Lower a semitone (flats)">▼</button>
         <button type="button" id="keyDel" class="iv-chip key-btn" title="Delete" aria-label="Delete">⌫</button>
         <span class="key-sep"></span>
-        <button type="button" id="barAdd" class="iv-chip key-btn bar-btn" title="Add a bar" aria-label="Add a bar">+ Bar</button>
-        <button type="button" id="barDel" class="iv-chip key-btn bar-btn" title="Remove the last bar" aria-label="Remove the last bar">− Bar</button>
+        <button type="button" id="barAdd" class="iv-chip key-btn bar-btn" title="Add a bar" aria-label="Add a bar">+Bar</button>
+        <button type="button" id="barDel" class="iv-chip key-btn bar-btn" title="Remove the last bar" aria-label="Remove the last bar">−Bar</button>
         <span class="key-sep"></span>
-        <button type="button" id="keyClear" class="iv-chip key-btn bar-btn" title="Clear all" aria-label="Clear all">Clear</button>
+        <button type="button" id="keyClear" class="iv-chip key-btn bar-btn" title="Clear all" aria-label="Clear all"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>
       <div id="keyboardWrap" class="keyboard-wrap"><div id="keyboard" class="keyboard"></div></div>
     </section>
@@ -258,7 +262,7 @@
           <dt><svg class="help-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6a.5.5 0 0 0 .1-.6l-1.9-3.3a.5.5 0 0 0-.6-.2l-2.4 1a7.4 7.4 0 0 0-1.7-1L14.5 2.7a.5.5 0 0 0-.5-.4h-3.8a.5.5 0 0 0-.5.4L9.4 5.3a7.4 7.4 0 0 0-1.7 1l-2.4-1a.5.5 0 0 0-.6.2L2.8 8.8a.5.5 0 0 0 .1.6L4.9 11a7.6 7.6 0 0 0 0 2l-2 1.6a.5.5 0 0 0-.1.6l1.9 3.3c.1.2.4.3.6.2l2.4-1c.5.4 1.1.7 1.7 1l.4 2.6c0 .2.3.4.5.4h3.8c.2 0 .5-.2.5-.4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.4 1c.2.1.5 0 .6-.2l1.9-3.3a.5.5 0 0 0-.1-.6L19.4 13ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg> Pitch hints</dt><dd>When you sing a wrong note or hold one out of tune, plays the right note and the next one. Hints are off during a performance.</dd>
         </dl>
         <p>Long phrases scroll on their own as you sing. You can also drag or scroll them.</p>
-        <p><b>Writing your own phrase.</b> The pencil <svg viewBox="0 0 24 24" width="15" height="15" class="help-ico" aria-hidden="true"><path d="M4 20l1-4.5L15.8 4.7a1.8 1.8 0 0 1 2.5 0l1 1a1.8 1.8 0 0 1 0 2.5L8.5 19z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.8 6.7l3.5 3.5" stroke="currentColor" stroke-width="1.8"/></svg> opens the phrase on the staff for editing, and a keyboard replaces the Pitch panel. The first button shows the note length in use (a quarter to start); tap it to choose another and, beside the lengths, the dot; then tap keys: each note goes after the selected one. Tap a note or rest on the staff to select it; ▲ and ▼ move it a semitone (▲ spells it with a sharp, ▼ with a flat), ⌫ deletes it, and choosing a length changes it. <i>+ Bar</i> adds a bar of rest to fill with notes, <i>− Bar</i> removes the last bar, and <i>Clear</i> starts again from one empty bar. Undo steps back. Press the pencil again to practise what you wrote.</p>
+        <p><b>Writing your own phrase.</b> The pencil <svg viewBox="0 0 24 24" width="15" height="15" class="help-ico" aria-hidden="true"><path d="M4 20l1-4.5L15.8 4.7a1.8 1.8 0 0 1 2.5 0l1 1a1.8 1.8 0 0 1 0 2.5L8.5 19z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.8 6.7l3.5 3.5" stroke="currentColor" stroke-width="1.8"/></svg> opens the phrase on the staff for editing, and a keyboard replaces the Pitch panel. The first button shows the note length in use (a quarter to start); tap it to choose another and, beside the lengths, the dot; then tap keys: each note goes after the selected one. Tap a note or rest on the staff to select it; ▲ and ▼ move it a semitone (▲ spells it with a sharp, ▼ with a flat), ⌫ deletes it, and choosing a length changes it. The second button shows the time signature; tap it to choose another (the bars are redrawn). <i>+Bar</i> adds a bar of rest to fill with notes, <i>−Bar</i> removes the last bar, and the bin clears everything, leaving one empty bar. Undo steps back. Press the pencil again to practise what you wrote.</p>
       </div>
 
       <div class="help-text" lang="zh-Hans" hidden>
@@ -338,7 +342,7 @@
           <dt><svg class="help-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6a.5.5 0 0 0 .1-.6l-1.9-3.3a.5.5 0 0 0-.6-.2l-2.4 1a7.4 7.4 0 0 0-1.7-1L14.5 2.7a.5.5 0 0 0-.5-.4h-3.8a.5.5 0 0 0-.5.4L9.4 5.3a7.4 7.4 0 0 0-1.7 1l-2.4-1a.5.5 0 0 0-.6.2L2.8 8.8a.5.5 0 0 0 .1.6L4.9 11a7.6 7.6 0 0 0 0 2l-2 1.6a.5.5 0 0 0-.1.6l1.9 3.3c.1.2.4.3.6.2l2.4-1c.5.4 1.1.7 1.7 1l.4 2.6c0 .2.3.4.5.4h3.8c.2 0 .5-.2.5-.4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.4 1c.2.1.5 0 .6-.2l1.9-3.3a.5.5 0 0 0-.1-.6L19.4 13ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg> 音高提示</dt><dd>你唱错音或某个音唱不准时，播放正确的音和下一个音。演唱录音时不提示。</dd>
         </dl>
         <p>较长的乐句会随你的演唱自动滚动，你也可以拖动或滚动它。</p>
-        <p><b>自己写乐句。</b>铅笔 <svg viewBox="0 0 24 24" width="15" height="15" class="help-ico" aria-hidden="true"><path d="M4 20l1-4.5L15.8 4.7a1.8 1.8 0 0 1 2.5 0l1 1a1.8 1.8 0 0 1 0 2.5L8.5 19z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.8 6.7l3.5 3.5" stroke="currentColor" stroke-width="1.8"/></svg> 打开五线谱上的乐句进行编辑，键盘取代音高面板。第一个按钮显示当前的音符时值（起初为四分音符），点按它可另选时值，长度旁边是附点按钮；然后点按琴键：每个音加在所选音符之后。点按谱上的音符或休止符可选中它；▲ 和 ▼ 将它升高或降低半音（▲ 用升号拼写，▼ 用降号），⌫ 删除，选择时值则改变它的长度。<i>+ 小节</i>加一个休止的小节供你填写，<i>− 小节</i>删除最后一小节，<i>清空</i>则从一个空小节重新开始。撤销可回到上一步。再按铅笔即可练习你写的乐句。</p>
+        <p><b>自己写乐句。</b>铅笔 <svg viewBox="0 0 24 24" width="15" height="15" class="help-ico" aria-hidden="true"><path d="M4 20l1-4.5L15.8 4.7a1.8 1.8 0 0 1 2.5 0l1 1a1.8 1.8 0 0 1 0 2.5L8.5 19z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.8 6.7l3.5 3.5" stroke="currentColor" stroke-width="1.8"/></svg> 打开五线谱上的乐句进行编辑，键盘取代音高面板。第一个按钮显示当前的音符时值（起初为四分音符），点按它可另选时值，长度旁边是附点按钮；然后点按琴键：每个音加在所选音符之后。点按谱上的音符或休止符可选中它；▲ 和 ▼ 将它升高或降低半音（▲ 用升号拼写，▼ 用降号），⌫ 删除，选择时值则改变它的长度。第二个按钮显示拍号，点按它可另选拍号（小节线随之重排）。<i>+小节</i>加一个休止的小节供你填写，<i>−小节</i>删除最后一小节，垃圾桶清空全部，只留一个空小节。撤销可回到上一步。再按铅笔即可练习你写的乐句。</p>
       </div>
 
       <h3 class="help-sources-title">Sources</h3>

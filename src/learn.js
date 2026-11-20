@@ -80,6 +80,14 @@ const NOTE_ICON = Object.fromEntries(Object.entries(NOTE_INNER).map(([k, v]) => 
 const LEN_BASE = { 4: 'w', 3: 'h', 2: 'h', 1.5: 'q', 1: 'q', 0.75: '8', 0.5: '8', 0.25: '16' };
 const lenIcon = (d) => iconSvg(NOTE_INNER[LEN_BASE[d]] + ([3, 1.5, 0.75].includes(d) ? `<circle cx="${LEN_BASE[d] === '8' ? 21.5 : 18.6}" cy="17.5" r="1.7" fill="currentColor"/>` : ''));
 
+/** Time signatures you can write in, and how a button shows one (stacked numbers, or ¢). */
+const EDIT_METERS = ['cut', '2/4', '3/4', '4/4', '5/4', '6/4', '7/4', '3/2', '3/8', '5/8', '6/8', '7/8', '9/8', '11/8', '12/8'];
+const tsLabel = (m) => {
+  if (m === 'cut') return '<span class="ts-label ts-cut">¢</span>';
+  const [n, d] = m.split('/');
+  return `<span class="ts-label"><b>${n}</b><b>${d}</b></span>`;
+};
+
 /** Rests, drawn on the staff (top = top line, gap = space). */
 function drawRest(ctx, base, dots, x, top, gap) {
   ctx.beginPath();
@@ -130,7 +138,7 @@ export class LearnUI {
       score: $('learnScore'),
       help: $('learnHelp'), perf: $('learnPerf'), edit: $('learnEdit'), undo: $('learnUndo'),
       keyboard: $('keyboard'), keyboardWrap: $('keyboardWrap'), keyLens: $('keyLens'),
-      rhythmBtn: $('rhythmBtn'), rhythmPop: $('rhythmPop'), keyUp: $('keyUp'), keyDown: $('keyDown'), keyDel: $('keyDel'), barAdd: $('barAdd'), barDel: $('barDel'), keyClear: $('keyClear'),
+      rhythmBtn: $('rhythmBtn'), rhythmPop: $('rhythmPop'), tsBtn: $('tsBtn'), tsPop: $('tsPop'), keyUp: $('keyUp'), keyDown: $('keyDown'), keyDel: $('keyDel'), barAdd: $('barAdd'), barDel: $('barDel'), keyClear: $('keyClear'),
     };
     this.surf = new Surface(this.el.canvas);
     let saved = null;
@@ -966,6 +974,17 @@ export class LearnUI {
     this.edit((N) => { N.splice(this.sel, 1); this.sel = Math.min(this.sel, N.length - 1); });
   }
 
+  showMeters(open) {
+    this.el.tsPop.hidden = !open;
+    this.el.tsBtn.setAttribute('aria-expanded', String(open));
+    if (open) this.el.tsPop.querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  }
+
+  setMeter(m) {
+    if (!this.score || this.score.meter === m) return;
+    this.edit(() => { this.score.meter = m; });
+  }
+
   showRhythm(open) {
     this.el.rhythmPop.hidden = !open;
     this.el.rhythmBtn.setAttribute('aria-expanded', String(open));
@@ -1018,7 +1037,14 @@ export class LearnUI {
       this.el.keyClear.addEventListener('click', () => this.clearAll());
       // Rhythm: open the length choices over the toolbar; any tap elsewhere closes them
       this.el.rhythmBtn.addEventListener('click', (e) => { e.stopPropagation(); this.showRhythm(this.el.rhythmPop.hidden); });
-      document.addEventListener('pointerdown', (e) => { if (!this.el.rhythmPop.hidden && !e.target.closest('.rhythm-pick')) this.showRhythm(false); });
+      document.addEventListener('pointerdown', (e) => {
+        if (!this.el.rhythmPop.hidden && !e.target.closest('.rhythm-pick:not(.ts-pick)')) this.showRhythm(false);
+        if (!this.el.tsPop.hidden && !e.target.closest('.ts-pick')) this.showMeters(false);
+      });
+      // Time signature: the same kind of button; a choice re-bars the phrase (undoable)
+      this.el.tsBtn.addEventListener('click', (e) => { e.stopPropagation(); this.showMeters(this.el.tsPop.hidden); });
+      this.el.tsPop.innerHTML = EDIT_METERS.map((m) => `<button type="button" class="iv-chip nv-chip ts-chip" data-meter="${m}" title="${m === 'cut' ? t('Cut time') : m}" aria-label="${m === 'cut' ? t('Cut time') : m}">${tsLabel(m)}</button>`).join('');
+      this.el.tsPop.querySelectorAll('[data-meter]').forEach((b) => b.addEventListener('click', () => this.setMeter(b.dataset.meter)));
       this.el.keyUp.addEventListener('click', () => this.nudge(1));
       this.el.keyDown.addEventListener('click', () => this.nudge(-1));
       this.el.keyDel.addEventListener('click', () => this.deleteNote());
@@ -1035,6 +1061,10 @@ export class LearnUI {
     dotBtn.disabled = this.editLen === 4 || this.editLen === 0.25;
     // the closed Rhythm button shows the length in use (and its dot)
     this.el.rhythmBtn.innerHTML = lenIcon(this.editDur()); // one icon: the note with its dot
+    if (this.score) {
+      this.el.tsBtn.innerHTML = tsLabel(this.score.meter);
+      this.el.tsPop.querySelectorAll('[data-meter]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.meter === this.score.meter)));
+    }
     [this.el.keyUp, this.el.keyDown].forEach((b) => { b.disabled = !selNote; });
     this.el.keyDel.disabled = !selItem;
     this.el.barDel.disabled = !this.score?.notes.length;

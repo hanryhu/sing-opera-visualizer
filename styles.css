@@ -129,20 +129,27 @@ body.learn-edit .tuner, body.learn-edit .f3, body.learn-edit .vowels { display: 
 body.learn-edit #learnRetry, body.learn-edit #learnPerf, body.learn-edit .split-btn, body.learn-edit #learnScore { display: none; }
 body:not(.learn-edit) #learnUndo { display: none; }
 #learnUndo:disabled { opacity: .35; cursor: default; }
-.keys-tools { position: relative; display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.keys-tools { position: relative; display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 .keys-tools::-webkit-scrollbar { display: none; }
 /* Rhythm: one button showing the current length; open, its choices cover the other tools in the same row */
 .rhythm-pick { flex: none; }
-.rhythm-btn { width: 46px; gap: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }
+.rhythm-btn { width: 40px; gap: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }
 .rhythm-btn svg:first-child { width: 22px; height: 22px; }
 .rhythm-pop { position: absolute; inset: 0; z-index: 4; display: flex; align-items: center; gap: 4px; background: var(--panel); }
 .rhythm-pop[hidden] { display: none; }
+.ts-pop { overflow-x: auto; scrollbar-width: none; }
+.ts-pop::-webkit-scrollbar { display: none; }
+.ts-btn { width: 32px; color: var(--accent); }
+.ts-chip { flex: none; width: 36px; }
+.ts-label { display: inline-flex; flex-direction: column; align-items: center; font: 700 12px/1 "Noto Serif", Georgia, serif; gap: 0; }
+.ts-label b { display: block; line-height: 0.95; }
+.ts-cut { font-size: 19px; }
 .key-lens { display: flex; gap: 4px; }
 .key-lens { flex: none; gap: 4px; }
 .key-lens .nv-chip { flex: none; width: 36px; height: 36px; }
 .key-lens [data-dot] { margin-left: 6px; }
 .key-lens .nv-chip:disabled { opacity: .35; cursor: default; }
-.key-btn { flex: none; min-width: 32px; height: 36px; padding: 0 6px; display: inline-grid; place-items: center; font-size: 15px; }
+.key-btn { flex: none; min-width: 30px; height: 36px; padding: 0 5px; display: inline-grid; place-items: center; font-size: 15px; }
 .key-btn:disabled { opacity: .35; cursor: default; }
 .bar-btn { font: 600 14px var(--ui); }
 .key-sep { flex: none; width: 1px; height: 24px; background: var(--line-strong); margin: 0 1px; }
