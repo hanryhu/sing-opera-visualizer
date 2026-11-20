@@ -1145,7 +1145,7 @@ export class LearnUI {
       Lp.contentW = avail;
     }
     const words = !!P.lang;
-    const top = h / 2 - 2 * gap - (words ? gap * (zh ? 2.4 : 1.8) : 0); // top staff line (raised to make room for words)
+    const top = Math.max(h / 2 - 2 * gap - (words ? gap * (zh ? 2.4 : 1.8) : 0), 40 + gap * 1.2); // top staff line: room for words below, clear of the toolbar above
     const bottomD = P.clef === 'treble' ? 30 : 18; // E4 / G2 = bottom line (diatonic number)
     const yOf = (n) => top + 4 * gap - ((n.oct * 7 + LETTERS.indexOf(n.letter)) - bottomD) * gap / 2;
     this.maxScroll = Math.max(0, Lp.contentW - avail);

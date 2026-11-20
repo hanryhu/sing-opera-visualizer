@@ -471,17 +471,17 @@ function applyLayout() {
   if (document.body.classList.contains('learn-on')) {
     // Learn: the staff on top; below it Pitch and the vowel chart side by side, F3 a thin strip at the right
     if (learn.editing) { // writing: the staff, then the keyboard
-      if (mobile) { add('230px', '"learn learn"'); add('auto', '"keys keys"'); add(c('input') ? H : view.detail ? '84px' : '64px', '"meter meter"'); dash.style.gridTemplateColumns = ''; }
+      if (mobile) { add('170px', '"learn learn"'); add('auto', '"keys keys"'); add(c('input') ? H : view.detail ? '84px' : '56px', '"meter meter"'); dash.style.gridTemplateColumns = ''; }
       else { add('minmax(0, 1.4fr)', '"learn learn learn meter"'); add('minmax(0, 1fr)', '"keys keys keys meter"'); dash.style.gridTemplateColumns = `minmax(0, 1.75fr) minmax(0, 1fr) 80px ${c('input') ? H : view.detail ? '96px' : '76px'}`; }
       dash.style.gridTemplateRows = rows.join(' ');
       dash.style.gridTemplateAreas = areas.join(' ');
       return;
     }
-    if (mobile) {
-      add('230px', '"learn learn"');
-      add(c('pitch') ? H : 'auto', '"tuner tuner"');
-      add(c('f3') && c('vowel') ? H : '300px', '"f3 map"');
-      add(c('input') ? H : view.detail ? '84px' : '64px', '"meter meter"');
+    if (mobile) { // compact, to fit one screen
+      add('170px', '"learn learn"');
+      add(c('pitch') ? H : '120px', '"tuner tuner"');
+      add(c('f3') && c('vowel') ? H : '210px', '"f3 map"');
+      add(c('input') ? H : view.detail ? '84px' : '56px', '"meter meter"');
       dash.style.gridTemplateColumns = '';
     } else {
       add('minmax(0, 1.15fr)', '"learn learn learn meter"');
@@ -713,6 +713,11 @@ loadSamples().then((list) => {
     `<span class="use">Sample (${esc(smp.part)}) · ${esc(smp.license)} · ${esc(smp.excerpt || 'excerpt')}</span></li>`).join(''));
 });
 document.getElementById('helpBtn').addEventListener('click', () => help.showModal());
+// Hide the header (remembered); the tab at the top brings it back
+const setHeader = (hidden) => { document.body.classList.toggle('header-hidden', hidden); store.set('va.headerHidden', hidden ? '1' : '0'); applyLayout(); };
+document.getElementById('headerHide').addEventListener('click', () => setHeader(true));
+document.getElementById('headerShow').addEventListener('click', () => setHeader(false));
+if (store.get('va.headerHidden', '0') === '1') document.body.classList.add('header-hidden');
 // Language: 中文 / English row in the Settings menu, under Help. Static text is translated by applyDom; these re-render the rest.
 document.getElementById('langBtn').addEventListener('click', () => setLang(getLang() === 'zh' ? 'en' : 'zh'));
 onLang(() => {

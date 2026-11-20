@@ -32,6 +32,11 @@ body {
 }
 
 /* ---------- top bar ---------- */
+body.header-hidden .topbar { display: none; }
+.header-tab { display: none; position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 40; width: 46px; height: 18px;
+  padding: 0; border: 1px solid var(--line-strong); border-top: 0; border-radius: 0 0 10px 10px; background: var(--panel-2); color: var(--muted); cursor: pointer; }
+.header-tab svg { display: block; margin: 0 auto; }
+body.header-hidden .header-tab { display: block; }
 .topbar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 12px 20px; border-bottom: 1px solid var(--line);
@@ -122,6 +127,17 @@ body {
 #learnCanvas { touch-action: pan-y; } /* horizontal drags scroll the staff; vertical ones scroll the page */
 @media (min-width: 761px) { body.learn-on .panel.collapsed:not(.learn) .panel-label { writing-mode: vertical-rl; left: 9px; } }
 body:not(.learn-on) #learnHelp { display: none; } /* Pitch hints: a Learn setting */
+/* Learn on a phone: compact panels so everything fits one screen; pitch readout beside its trace */
+@media (max-width: 760px) {
+  body.learn-on .tuner { grid-template-columns: 104px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  body.learn-on .tuner-readout { border-bottom: 0; border-right: 1px solid var(--line); padding: 22px 6px 6px; gap: 0; }
+  body.learn-on .note { font-size: 40px; }
+  body.learn-on .note .oct { font-size: 15px; margin: 4px 0 0 2px; }
+  body.learn-on .tune-state { font-size: 12px; height: 16px; }
+  body.learn-on .tuner .gauge { height: 26px; margin-top: 2px; }
+  body.learn-on .vib-wrap { display: none; }
+  body.learn-on .dashboard { padding-top: 8px; gap: 8px; }
+}
 /* Writing a phrase: the keyboard panel replaces Pitch / vowel / F3; the toolbar keeps Play, Undo and the pencil */
 .keys { grid-area: keys; display: none; flex-direction: column; padding: 8px 10px 10px; gap: 8px; }
 body.learn-edit .keys { display: flex; }
