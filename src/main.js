@@ -169,7 +169,7 @@ function reopenMic(delayMs = 0) {
 }
 const learn = new LearnUI({
   getVoice: () => voice, getCtx: () => session?.ctx || null, getTap: () => session?.tap || null, mute: MUTE_DEMO,
-  releaseMic, reopenMic,
+  releaseMic, reopenMic, relayout: () => applyLayout(),
 });
 window.__learn = learn; // dev/QA hook
 loadSamples().then((list) => {
@@ -470,6 +470,13 @@ function applyLayout() {
   const side = mobile ? '' : ' meter';
   if (document.body.classList.contains('learn-on')) {
     // Learn: the staff on top; below it Pitch and the vowel chart side by side, F3 a thin strip at the right
+    if (learn.editing) { // writing: the staff, then the keyboard
+      if (mobile) { add('230px', '"learn learn"'); add('auto', '"keys keys"'); add(c('input') ? H : view.detail ? '84px' : '64px', '"meter meter"'); dash.style.gridTemplateColumns = ''; }
+      else { add('minmax(0, 1.4fr)', '"learn learn learn meter"'); add('minmax(0, 1fr)', '"keys keys keys meter"'); dash.style.gridTemplateColumns = `minmax(0, 1.75fr) minmax(0, 1fr) 80px ${c('input') ? H : view.detail ? '96px' : '76px'}`; }
+      dash.style.gridTemplateRows = rows.join(' ');
+      dash.style.gridTemplateAreas = areas.join(' ');
+      return;
+    }
     if (mobile) {
       add('230px', '"learn learn"');
       add(c('pitch') ? H : 'auto', '"tuner tuner"');

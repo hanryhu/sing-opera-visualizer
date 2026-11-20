@@ -426,3 +426,43 @@ export function generateTextRhythm(R, T, lines, minBars, maxBars) {
   });
   return { measures, events };
 }
+
+/* ---------------- phrases you write yourself ---------------- */
+/**
+ * Bars and written pieces for a list of note lengths (quarters) in one meter. Notes crossing a barline are
+ * tied; the last bar may be incomplete while you are still writing.
+ */
+export function rhythmFromDurations(durs, sig = '4/4') {
+  const M = METERS[sig] || METERS['4/4'];
+  const len = M.beats.reduce((a, b) => a + b, 0);
+  const total = durs.reduce((a, b) => a + b, 0);
+  const nBars = Math.max(1, Math.ceil(total / len - EPS));
+  const measures = [];
+  for (let m = 0; m < nBars; m++) {
+    const left = total - m * len;
+    measures.push({ start: m * len, len: left > EPS && left < len ? left : len, meter: sig, showSig: m === 0 });
+  }
+  const bounds = [0];
+  M.beats.forEach((b) => bounds.push(bounds[bounds.length - 1] + b));
+  const beatsAbs = [];
+  measures.forEach((mz) => bounds.forEach((b) => { if (b <= mz.len + EPS) beatsAbs.push(mz.start + b); }));
+  const events = [];
+  let pos = 0;
+  for (const d of durs) {
+    const pieces = [];
+    let p = pos, left = d, guard = 0;
+    while (left > EPS && guard++ < 40) {
+      const m = Math.min(measures.length - 1, Math.floor(p / len + EPS));
+      const seg = Math.min(left, measures[m].start + len - p);
+      const type = noteType(seg);
+      if (type) pieces.push({ start: p, dur: seg, type, tup: null, m });
+      else for (const w of writable(p, seg, beatsAbs)) pieces.push({ ...w, type: noteType(w.dur) || noteType(0.25), tup: null, m });
+      p += seg; left -= seg;
+    }
+    const inBar = pos - measures[pieces[0].m].start;
+    const strong = eq(inBar, 0) || M.strong.some((k) => eq(bounds[k], inBar));
+    events.push({ start: pos, dur: d, pieces, strong, m: pieces[0].m });
+    pos += d;
+  }
+  return { measures, events };
+}

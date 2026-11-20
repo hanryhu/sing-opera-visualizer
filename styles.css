@@ -122,6 +122,29 @@ body {
 #learnCanvas { touch-action: pan-y; } /* horizontal drags scroll the staff; vertical ones scroll the page */
 @media (min-width: 761px) { body.learn-on .panel.collapsed:not(.learn) .panel-label { writing-mode: vertical-rl; left: 9px; } }
 body:not(.learn-on) #learnHelp { display: none; } /* Pitch hints: a Learn setting */
+/* Writing a phrase: the keyboard panel replaces Pitch / vowel / F3; the toolbar keeps Play, Undo and the pencil */
+.keys { grid-area: keys; display: none; flex-direction: column; padding: 8px 10px 10px; gap: 8px; }
+body.learn-edit .keys { display: flex; }
+body.learn-edit .tuner, body.learn-edit .f3, body.learn-edit .vowels { display: none; }
+body.learn-edit #learnRetry, body.learn-edit #learnPerf, body.learn-edit .split-btn, body.learn-edit #learnScore { display: none; }
+body:not(.learn-edit) #learnUndo { display: none; }
+#learnUndo:disabled { opacity: .35; cursor: default; }
+.keys-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.key-lens { display: flex; gap: 4px; }
+.key-lens .nv-chip { width: 38px; height: 36px; }
+.key-btn { min-width: 36px; height: 36px; padding: 0 8px; display: inline-grid; place-items: center; font-size: 15px; }
+.key-btn:disabled { opacity: .35; cursor: default; }
+.bar-btn { font: 600 14px var(--ui); }
+.key-sep { width: 1px; height: 24px; background: var(--line-strong); margin: 0 2px; }
+.keyboard-wrap { position: relative; overflow-x: auto; overflow-y: hidden; flex: 1; min-height: 110px; max-height: 170px; -webkit-overflow-scrolling: touch; }
+.keyboard { position: relative; height: 100%; min-height: 110px; }
+.key { position: absolute; top: 0; padding: 0; cursor: pointer; border-radius: 0 0 6px 6px; touch-action: manipulation; }
+.key.white { width: 35px; height: 100%; background: #e9ebf1; border: 1px solid #8b93a7; z-index: 1; }
+.key.black { width: 24px; height: 60%; background: #1b1f28; border: 1px solid #000; z-index: 2; border-radius: 0 0 4px 4px; }
+.key span { position: absolute; left: 0; right: 0; bottom: 4px; font: 600 10px var(--ui); color: #566074; text-align: center; pointer-events: none; }
+.key.white:active, .key.white.on { background: #a9d6ff; }
+.key.black:active, .key.black.on { background: #3b6ea8; }
+#learnEdit[aria-pressed="true"] { color: var(--accent); border-color: rgba(124, 196, 255, .55); background: rgba(124, 196, 255, .12); }
 .learn-tools { position: absolute; top: 8px; right: 10px; z-index: 3; display: flex; align-items: center; gap: 6px; }
 .learn-score { font: 600 14px var(--ui); color: var(--green); font-variant-numeric: tabular-nums; margin-right: 4px; }
 .learn-menu { position: relative; display: flex; }

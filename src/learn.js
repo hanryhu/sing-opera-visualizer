@@ -6,7 +6,7 @@ import { Surface, C } from './ui/panels.js';
 import { midiToFreq } from './dsp/pitch.js';
 import { t } from './i18n.js';
 import { spellLine, nextAtonal, tonalLine, keySigMap, TONAL_STYLES } from './melody.js';
-import { generateRhythm, generateTextRhythm, METERS, SIG_CHOICES, NOTE_VALUES, DEFAULT_RHYTHM, DEFAULT_TEMPO } from './rhythm.js';
+import { generateRhythm, generateTextRhythm, rhythmFromDurations, METERS, SIG_CHOICES, NOTE_VALUES, DEFAULT_RHYTHM, DEFAULT_TEMPO } from './rhythm.js';
 import { lyricLines, LANGS } from './lyrics.js';
 import { analyzeSyllable } from './phonetics.js';
 import { VOICE_PRESETS, pitchAdjustedLandmarks } from './vowels.js';
@@ -65,6 +65,41 @@ export function generatePhrase({ intervals, voice = 'low', measures = 4, rhythm:
   return assemble(rh, mids, spellLine(mids.map((midi) => ({ midi }))), voice);
 }
 
+/** Small drawn note icons (music-font characters don't render everywhere, e.g. iPhone Safari). */
+const noteHead = (filled) => `<ellipse cx="9.5" cy="18" rx="4.4" ry="3.1" transform="rotate(-22 9.5 18)" ${filled ? 'fill="currentColor"' : 'fill="none" stroke="currentColor" stroke-width="1.7"'}/>`;
+const STEM = '<path d="M13.6 17V3.5" stroke="currentColor" stroke-width="1.5"/>';
+const flagSvg = (y) => `<path d="M13.6 ${y}c.4 2.6 4.6 3.6 4.4 7.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>`;
+const iconSvg = (inner) => `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">${inner}</svg>`;
+const NOTE_ICON = {
+  w: iconSvg('<ellipse cx="12" cy="14" rx="5.2" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.9"/>'),
+  h: iconSvg(noteHead(false) + STEM), q: iconSvg(noteHead(true) + STEM),
+  8: iconSvg(noteHead(true) + STEM + flagSvg(3.5)), 16: iconSvg(noteHead(true) + STEM + flagSvg(3.5) + flagSvg(7.5)),
+};
+
+/** Rests, drawn on the staff (top = top line, gap = space). */
+function drawRest(ctx, base, dots, x, top, gap) {
+  ctx.beginPath();
+  if (base === 'w') ctx.fillRect(x - gap * 0.55, top + gap, gap * 1.1, gap * 0.5);         // hangs from the 4th line
+  else if (base === 'h') ctx.fillRect(x - gap * 0.55, top + gap * 1.5, gap * 1.1, gap * 0.5); // sits on the middle line
+  else if (base === 'q') {
+    ctx.lineWidth = gap * 0.32; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.moveTo(x - gap * 0.25, top + gap * 0.5); ctx.lineTo(x + gap * 0.35, top + gap * 1.35);
+    ctx.lineTo(x - gap * 0.25, top + gap * 2.15); ctx.lineTo(x + gap * 0.35, top + gap * 2.95);
+    ctx.quadraticCurveTo(x - gap * 0.6, top + gap * 2.8, x - gap * 0.05, top + gap * 3.6);
+    ctx.stroke();
+  } else { // eighth and sixteenth: a hook on a slanted stem
+    const n = base === '16' ? 2 : 1;
+    ctx.lineWidth = gap * 0.16;
+    ctx.moveTo(x + gap * 0.4, top + gap * 1.3); ctx.lineTo(x - gap * 0.1, top + gap * (n === 2 ? 3.8 : 3.0)); ctx.stroke();
+    for (let k = 0; k < n; k++) {
+      const yy = top + gap * (1.45 + k);
+      ctx.beginPath(); ctx.arc(x - gap * 0.25, yy, gap * 0.22, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x - gap * 0.25, yy + gap * 0.1); ctx.quadraticCurveTo(x + gap * 0.1, yy + gap * 0.3, x + gap * 0.4 - k * gap * 0.2, yy - gap * 0.15); ctx.stroke();
+    }
+  }
+  if (dots) { ctx.beginPath(); ctx.arc(x + gap * 0.9, top + gap * 1.5, gap * 0.17, 0, Math.PI * 2); ctx.fill(); }
+}
+
 /**
  * Draw ♯ ♭ ♮ placed by the glyph's measured ink (font metrics vary): a sharp or natural is centred on its
  * line or space; a flat's bowl sits on it, so its ink bottom goes half a space below.
@@ -89,7 +124,9 @@ export class LearnUI {
       panel: $('learnPanel'), canvas: $('learnCanvas'), retry: $('learnRetry'), reroll: $('learnReroll'),
       rerollMenuBtn: $('learnRerollMenu'), rerollMenu: $('learnIntervals'), play: $('learnPlay'),
       score: $('learnScore'),
-      help: $('learnHelp'), perf: $('learnPerf'),
+      help: $('learnHelp'), perf: $('learnPerf'), edit: $('learnEdit'), undo: $('learnUndo'),
+      keyboard: $('keyboard'), keyboardWrap: $('keyboardWrap'), keyLens: $('keyLens'), keyDot: $('keyDot'),
+      keyUp: $('keyUp'), keyDown: $('keyDown'), keyDel: $('keyDel'), barAdd: $('barAdd'), barDel: $('barDel'),
     };
     this.surf = new Surface(this.el.canvas);
     let saved = null;
@@ -119,6 +156,10 @@ export class LearnUI {
     this.barX = null;
 
     this.el.retry.addEventListener('click', () => { this.stopPlayback(); this.reset(); });
+    // Write your own phrase: the pencil switches the staff into editing; Undo steps back
+    this.editing = false; this.sel = -1; this.undoStack = []; this.editLen = 1; this.editDot = false;
+    this.el.edit.addEventListener('click', () => this.toggleEdit());
+    this.el.undo.addEventListener('click', () => this.undo());
     // Help (toggle): when the singer goes wrong, play the right note and the next one
     try { this.helpOn = localStorage.getItem('va.learn.help') === '1'; } catch { this.helpOn = false; }
     this.el.help.setAttribute('aria-pressed', String(this.helpOn));
@@ -156,7 +197,18 @@ export class LearnUI {
         if (drag.moved && this.maxScroll) this.scroll = this.scrollTarget = clamp(drag.s - (e.clientX - drag.x));
       } else cv.style.cursor = noteAt(e) ? 'pointer' : '';
     });
-    cv.addEventListener('pointerup', (e) => { const h = drag && !drag.moved && noteAt(e); if (h) this.playStartPitch(h.i); drag = null; });
+    cv.addEventListener('pointerup', (e) => {
+      const tap = drag && !drag.moved, h = tap && noteAt(e);
+      drag = null;
+      if (!tap) return;
+      if (this.editing) { // select a note or rest (or nothing: new notes go at the end)
+        this.sel = h ? h.si : -1;
+        if (h && h.i >= 0) this.playPitch(this.phrase.notes[h.i].midi);
+        this.renderKeys();
+        return;
+      }
+      if (h && h.i >= 0) this.playStartPitch(h.i);
+    });
     cv.addEventListener('pointercancel', () => { drag = null; });
     this.el.play.addEventListener('click', () => (this.playing ? this.stopPlayback() : this.done && this.take ? this.playTake() : this.play()));
     const toggleMenu = (btn, menu) => (e) => {
@@ -196,16 +248,7 @@ export class LearnUI {
     }));
     if (this.page === 1) { // Rhythm
       const R = this.rhythm;
-      // drawn note icons (the music-font characters don't render everywhere, e.g. iPhone Safari)
-      const noteHead = (filled) => `<ellipse cx="9.5" cy="18" rx="4.4" ry="3.1" transform="rotate(-22 9.5 18)" ${filled ? 'fill="currentColor"' : 'fill="none" stroke="currentColor" stroke-width="1.7"'}/>`;
-      const stem = '<path d="M13.6 17V3.5" stroke="currentColor" stroke-width="1.5"/>';
-      const flag = (y) => `<path d="M13.6 ${y}c.4 2.6 4.6 3.6 4.4 7.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>`;
-      const svg = (inner) => `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">${inner}</svg>`;
-      const GLYPH = {
-        w: svg('<ellipse cx="12" cy="14" rx="5.2" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.9"/>'),
-        h: svg(noteHead(false) + stem), q: svg(noteHead(true) + stem),
-        8: svg(noteHead(true) + stem + flag(3.5)), 16: svg(noteHead(true) + stem + flag(3.5) + flag(7.5)),
-      };
+      const GLYPH = NOTE_ICON;
       const NAME = { 16: 'Sixteenth', 8: 'Eighth', q: 'Quarter', h: 'Half', w: 'Whole' };
       this.el.rerollMenu.innerHTML = head +
         `<div class="nv-grid">${NOTE_VALUES.map((v) => `<button type="button" class="iv-chip nv-chip" data-nv="${v}" aria-pressed="${R.values.includes(v)}" title="${t(NAME[v])}" aria-label="${t(NAME[v])}">${GLYPH[v]}</button>`).join('')}</div>` +
@@ -306,11 +349,15 @@ export class LearnUI {
   }
 
   open() { this.el.panel.hidden = false; if (!this.phrase) this.reroll(); }
-  close() { this.stopPlayback(); this.closeMenus(); this.el.panel.hidden = true; }
+  close() {
+    this.stopPlayback(); this.closeMenus(); this.el.panel.hidden = true;
+    if (this.editing) { this.editing = false; document.body.classList.remove('learn-edit'); this.el.edit.setAttribute('aria-pressed', 'false'); }
+  }
   get isOpen() { return !this.el.panel.hidden; }
 
   /** New phrase. 'random': short, fits the screen. 'book': book-length (about 12 bars), scrolls. */
   reroll(kind = this.kind || 'random') {
+    if (kind === 'custom') kind = 'random'; // the dice always makes a new phrase
     this.stopPlayback();
     this.cancelPerformance();
     this.kind = kind;
@@ -329,7 +376,7 @@ export class LearnUI {
   }
 
   /** Voice range changed: re-generate if nothing has been sung yet. */
-  voiceChanged() { if (this.isOpen && !this.started) this.reroll(); }
+  voiceChanged() { if (this.isOpen && !this.started && !this.editing && this.kind !== 'custom') this.reroll(); }
 
   reset() {
     this.idx = 0; this.started = false; this.done = false; this.octShift = null;
@@ -367,6 +414,7 @@ export class LearnUI {
   tick(o, now) {
     if (!this.isOpen || !this.phrase) return;
     const notes = this.phrase.notes;
+    if (this.editing || !notes.length) { this.draw(now); return; } // writing: nothing to follow
     const quiet = this.playing || now < (this.quietUntil || 0); // ignore the speaker during playback
     if (!quiet && !this.done && o?.voiced && o.midiFast) {
       this.silentSince = null;
@@ -460,8 +508,11 @@ export class LearnUI {
     this.reset();
     const spb = 60 / BPM;
     let tt = ctx.currentTime + 0.1;
-    const list = this.phrase.notes.map((n) => { const e = { midi: n.midi, t: tt, d: n.dur * spb }; tt += e.d; return e; });
-    this.startPlaying({ ctx, out: this.tones(ctx, list, 0.22), times: list.map((e) => e.t), end: tt });
+    const t0 = tt, ns = this.phrase.notes;
+    if (!ns.length) return;
+    const list = ns.map((n) => ({ midi: n.midi, t: t0 + n.start * spb, d: n.dur * spb }));
+    const last = ns[ns.length - 1];
+    this.startPlaying({ ctx, out: this.tones(ctx, list, 0.22), times: list.map((e) => e.t), end: t0 + (last.start + last.dur) * spb });
   }
 
   startPlaying(p) {
@@ -576,8 +627,8 @@ export class LearnUI {
     // timeline: vowel starts on the beat
     const notes = P.notes, starts = [];
     let tt = t0;
-    for (const n of notes) { starts.push(tt); tt += n.dur * spb; }
-    const end = tt;
+    for (const n of notes) starts.push(t0 + n.start * spb); // rests keep their time
+    const end = notes.length ? t0 + (notes[notes.length - 1].start + notes[notes.length - 1].dur) * spb : t0;
     const syl = notes.map((n) => analyzeSyllable(n.syl.orig ?? n.syl.text, lang, n.syl.stress));
     noise.start(t0 - 0.4);
     notes.forEach((n, i) => {
@@ -770,6 +821,206 @@ export class LearnUI {
     return buf;
   }
 
+  /* ---------------- writing your own phrase ---------------- */
+  // The score is the saved form of a phrase you write: plain data (meter, clef, and each note's pitch,
+  // length and spelling), so it can be stored or shared later without changing anything else.
+  scoreFromPhrase() {
+    const P = this.phrase, meters = [...new Set((P?.measures || []).map((m) => m.meter))];
+    const meter = meters.length === 1 && !/[579]\/8|11\/8|7\/4|5\/4/.test(meters[0]) ? meters[0] : '4/4';
+    const q = (d) => Math.max(0.25, Math.round(d * 4) / 4); // triplet lengths round to the grid
+    return {
+      v: 1, meter, clef: P?.clef || (this.h.getVoice() === 'high' ? 'treble' : 'bass'),
+      notes: (P?.notes || []).map((n) => ({ midi: n.midi, dur: q(n.dur), letter: n.letter, acc: n.acc, oct: n.oct })),
+    };
+  }
+
+  phraseFromScore(S = this.score) {
+    const rh = rhythmFromDurations(S.notes.map((n) => n.dur), S.meter);
+    const notes = [], rests = []; // rests are drawn and timed but not sung (the follower skips them)
+    rh.events.forEach((e, i) => {
+      const it = S.notes[i];
+      if (it.rest) rests.push({ ...e, rest: true, si: i });
+      else notes.push({ ...e, midi: it.midi, letter: it.letter, acc: it.acc, oct: it.oct, si: i });
+    });
+    return { notes, rests, measures: rh.measures, clef: S.clef, sig: 0, custom: true };
+  }
+
+  barLen() { return METERS[this.score.meter].beats.reduce((a, b) => a + b, 0); }
+
+  /** + Bar: a rest that fills the last bar and one more. */
+  addBar() {
+    this.edit((N) => {
+      const len = this.barLen(), total = N.reduce((a, n) => a + n.dur, 0);
+      const rem = (len - (total % len)) % len;
+      N.push({ rest: true, dur: rem + len });
+      this.sel = N.length - 1;
+    });
+  }
+
+  /** − Bar: remove the last bar (a note held into it is cut at the barline). */
+  removeBar() {
+    const total = this.score.notes.reduce((a, n) => a + n.dur, 0);
+    if (total <= 0) return;
+    this.edit((N) => {
+      const len = this.barLen(), cut = Math.floor((total - 1e-6) / len) * len;
+      let t = 0;
+      const keep = [];
+      for (const n of N) {
+        if (t >= cut - 1e-6) break;
+        keep.push(t + n.dur > cut + 1e-6 ? { ...n, dur: cut - t } : n);
+        t += n.dur;
+      }
+      N.length = 0; N.push(...keep);
+      this.sel = Math.min(this.sel, N.length - 1);
+    });
+  }
+
+  /** Spell a MIDI note: ▲ (or a rising line) uses sharps, ▼ (or a falling line) flats. */
+  static spellDir(midi, up) {
+    const name = (up ? ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'] : ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'])[((midi % 12) + 12) % 12];
+    return { letter: name[0], acc: name.length > 1 ? (up ? 1 : -1) : 0, oct: Math.floor(midi / 12) - 1 };
+  }
+
+  toggleEdit() {
+    if (!this.editing) {
+      this.stopPlayback(); this.cancelPerformance(); this.closeMenus();
+      this.score = this.scoreFromPhrase();
+      this.undoStack = [];
+      this.sel = this.score.notes.length - 1;
+      this.editing = true;
+    } else {
+      this.editing = false;
+      this.kind = 'custom';
+    }
+    document.body.classList.toggle('learn-edit', this.editing);
+    this.el.edit.setAttribute('aria-pressed', String(this.editing));
+    this.el.edit.title = t(this.editing ? 'Done' : 'Write your own phrase');
+    this.rebuild();
+    this.h.relayout?.();
+    if (this.editing) this.renderKeys(true);
+  }
+
+  /** Rebuild the phrase from the score after an edit (the staff updates at once). */
+  rebuild() {
+    if (this.score) this.phrase = this.phraseFromScore();
+    this.reset();
+    this.renderKeys();
+  }
+
+  edit(fn) {
+    this.undoStack.push(JSON.stringify({ score: this.score, sel: this.sel }));
+    if (this.undoStack.length > 200) this.undoStack.shift();
+    fn(this.score.notes);
+    this.rebuild();
+  }
+
+  undo() {
+    const s = this.undoStack.pop();
+    if (!s) return;
+    const o = JSON.parse(s);
+    this.score = o.score; this.sel = o.sel;
+    this.rebuild();
+  }
+
+  /** A key on the keyboard: insert after the selected note (or at the end) and select it. */
+  keyPressed(midi) {
+    this.playPitch(midi);
+    this.edit((N) => {
+      // into the selected rest, or the rest right after the selected note; otherwise inserted after it
+      let at = this.sel >= 0 ? (N[this.sel]?.rest ? this.sel : this.sel + 1) : N.length;
+      const prev = N.slice(0, at).reverse().find((n) => !n.rest);
+      const note = { midi, dur: this.editDur(), ...LearnUI.spellDir(midi, !prev || midi >= prev.midi) };
+      const r = N[at];
+      if (r?.rest) {
+        note.dur = Math.min(note.dur, r.dur);
+        r.dur -= note.dur;
+        N.splice(at, 0, note);
+        if (r.dur < 1e-6) N.splice(at + 1, 1);
+      } else N.splice(at, 0, note);
+      this.sel = at;
+    });
+  }
+
+  /** ▲ / ▼: move the selected note a semitone; ▲ spells with sharps, ▼ with flats. */
+  nudge(step) {
+    if (this.sel < 0 || this.score.notes[this.sel]?.rest) return;
+    this.edit((N) => {
+      const n = N[this.sel], midi = n.midi + step;
+      Object.assign(n, { midi, ...LearnUI.spellDir(midi, step > 0) });
+    });
+    this.playPitch(this.score.notes[this.sel].midi);
+  }
+
+  deleteNote() {
+    if (this.sel < 0) return;
+    this.edit((N) => { N.splice(this.sel, 1); this.sel = Math.min(this.sel, N.length - 1); });
+  }
+
+  editDur() { return (this.editLen || 1) * (this.editDot ? 1.5 : 1); }
+
+  /** Length and dot buttons: set the length for new notes, and change the selected note's length. */
+  setLength(len, dot = this.editDot) {
+    this.editLen = len; this.editDot = dot && len !== 4 && len !== 0.25; // no dotted whole or sixteenth here
+    if (this.sel >= 0 && !this.score.notes[this.sel].rest) this.edit((N) => { N[this.sel].dur = this.editDur(); });
+    else this.renderKeys();
+  }
+
+  playPitch(midi) {
+    const ctx = this.audioCtx();
+    this.h.releaseMic?.();
+    this.tones(ctx, [{ midi, t: ctx.currentTime + 0.03, d: 0.7 }], 0.25);
+    this.quietUntil = performance.now() / 1000 + 1.0;
+    this.h.reopenMic?.(800);
+  }
+
+  /** The keyboard panel: keys (built once), and which length / dot / key is current. */
+  renderKeys(scrollToRange = false) {
+    const kb = this.el.keyboard;
+    if (!kb) return;
+    if (!kb.childElementCount) {
+      const WHITE = [0, 2, 4, 5, 7, 9, 11];
+      let x = 0;
+      for (let m = 36; m <= 84; m++) {
+        const pc = m % 12, white = WHITE.includes(pc);
+        const k = document.createElement('button');
+        k.type = 'button'; k.className = white ? 'key white' : 'key black'; k.dataset.midi = m;
+        k.setAttribute('aria-label', `${['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'][pc]}${Math.floor(m / 12) - 1}`);
+        if (white) { k.style.left = `${x * 36}px`; if (pc === 0) k.innerHTML = `<span>C${Math.floor(m / 12) - 1}</span>`; x++; }
+        else k.style.left = `${x * 36 - 12}px`;
+        k.addEventListener('click', () => this.keyPressed(m));
+        kb.appendChild(k);
+      }
+      kb.style.width = `${x * 36}px`;
+      this.el.keyLens.innerHTML = [4, 2, 1, 0.5, 0.25].map((l) => `<button type="button" class="iv-chip nv-chip" data-len="${l}" title="${t({ 4: 'Whole', 2: 'Half', 1: 'Quarter', 0.5: 'Eighth', 0.25: 'Sixteenth' }[l])}">${NOTE_ICON[{ 4: 'w', 2: 'h', 1: 'q', 0.5: '8', 0.25: '16' }[l]]}</button>`).join('');
+      this.el.keyLens.querySelectorAll('[data-len]').forEach((b) => b.addEventListener('click', () => this.setLength(Number(b.dataset.len))));
+      this.el.barAdd.addEventListener('click', () => this.addBar());
+      this.el.barDel.addEventListener('click', () => this.removeBar());
+      this.el.keyDot.addEventListener('click', () => this.setLength(this.editLen || 1, !this.editDot));
+      this.el.keyUp.addEventListener('click', () => this.nudge(1));
+      this.el.keyDown.addEventListener('click', () => this.nudge(-1));
+      this.el.keyDel.addEventListener('click', () => this.deleteNote());
+    }
+    const selItem = this.editing && this.sel >= 0 ? this.score?.notes[this.sel] : null;
+    const selNote = selItem && !selItem.rest ? selItem : null;
+    if (selNote) { // the selected note shows its own length
+      const base = [4, 2, 1, 0.5, 0.25].find((l) => Math.abs(selNote.dur - l) < 1e-6 || Math.abs(selNote.dur - l * 1.5) < 1e-6);
+      if (base) { this.editLen = base; this.editDot = Math.abs(selNote.dur - base * 1.5) < 1e-6; }
+    }
+    this.el.keyLens.querySelectorAll('[data-len]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.len) === (this.editLen || 1))));
+    this.el.keyDot.setAttribute('aria-pressed', String(!!this.editDot));
+    [this.el.keyUp, this.el.keyDown].forEach((b) => { b.disabled = !selNote; });
+    this.el.keyDel.disabled = !selItem;
+    this.el.barDel.disabled = !this.score?.notes.length;
+    this.el.undo.disabled = !this.undoStack?.length;
+    kb.querySelectorAll('.key.on').forEach((k) => k.classList.remove('on'));
+    if (selNote) kb.querySelector(`[data-midi="${selNote.midi}"]`)?.classList.add('on');
+    if (scrollToRange) {
+      const [lo, hi] = RANGE[this.h.getVoice()] || RANGE.low;
+      const k = kb.querySelector(`[data-midi="${Math.round((lo + hi) / 2)}"]`);
+      if (k) this.el.keyboardWrap.scrollLeft = k.offsetLeft - this.el.keyboardWrap.clientWidth / 2;
+    }
+  }
+
   /* ---------------- drawing ---------------- */
   /** Positions of everything along the staff, in content coordinates (scrolling adds an offset). */
   layout() {
@@ -797,6 +1048,7 @@ export class LearnUI {
         // pieces of this bar, in time order
         const ps = [];
         notes.forEach((n, i) => n.pieces.forEach((pc, k) => { if (pc.m === m) ps.push({ n, i, k, pc }); }));
+        (P.rests || []).forEach((r) => r.pieces.forEach((pc, k) => { if (pc.m === m) ps.push({ n: r, i: -1, k, pc, rest: true }); }));
         ps.sort((a, b) => a.pc.start - b.pc.start);
         for (const it of ps) {
           const acc = it.k === 0 && shown[it.i] != null;
@@ -807,7 +1059,7 @@ export class LearnUI {
             lyricRight = x + gap * 0.6 + wd / 2;
           }
           heads.push({ ...it, x: x + gap * 0.6 });
-          if (it.k === 0) xs[it.i] = x + gap * 0.6;
+          if (it.k === 0 && it.i >= 0) xs[it.i] = x + gap * 0.6;
           x += gap * (1.25 + 1.45 * Math.sqrt(it.pc.dur)) + (it.pc.type.dots ? gap * 0.5 : 0);
           ni++;
         }
@@ -867,9 +1119,16 @@ export class LearnUI {
     const L = this.layout(), { gap, top, yOf, xs } = L;
     const notes = this.phrase.notes;
 
-    // Follower bar (behind the notes)
+    // Follower bar (behind the notes); while writing it marks the selected note (or the end)
     let target;
-    if (this.playing) {
+    if (this.editing || !notes.length) {
+      const hd = L.heads.find((h) => h.k === 0 && h.n.si === this.sel);
+      target = hd ? hd.x : L.contentW;
+      this.curIdx = 0;
+      if (hd) { // keep the selection in view
+        if (hd.x < this.scrollTarget + 20 || hd.x > this.scrollTarget + L.avail - 20) this.scrollTarget = Math.max(0, Math.min(this.maxScroll, hd.x - L.avail / 2));
+      } else this.scrollTarget = this.maxScroll;
+    } else if (this.playing) {
       const ct = this.playing.ctx.currentTime;
       let i = this.playing.times.findIndex((tt, k) => ct < (this.playing.times[k + 1] ?? this.playing.end));
       if (i < 0) i = notes.length - 1;
@@ -888,7 +1147,7 @@ export class LearnUI {
     // Page turn: when the singer reaches a bar whose next bar is not fully in view (or is off to the left),
     // scroll so that bar becomes the first one shown. Only on reaching a new bar, so free scrolling isn't undone.
     const bar = L.measOf[this.curIdx] ?? 0;
-    if (bar !== this.turnM) {
+    if (!this.editing && bar !== this.turnM) {
       this.turnM = bar;
       const nextEnd = L.measStart[bar + 2] ?? L.contentW;
       if (nextEnd > this.scrollTarget + L.avail || L.measStart[bar] < this.scrollTarget) {
@@ -960,6 +1219,7 @@ export class LearnUI {
     ctx.save(); clip();
     const mid = top + 2 * gap;
     const colorOf = (i) => {
+      if (this.editing) return notes[i]?.si === this.sel ? C.accent : C.text;
       const r = i < this.idx || this.done ? this.ratings[i] : i === this.idx && this.started ? this.live : null;
       return r?.state && COLORS[r.state] ? COLORS[r.state] : r?.state === 'missed' ? C.faint : C.text;
     };
@@ -973,6 +1233,7 @@ export class LearnUI {
     const groups = [];
     let cur = null;
     for (const hd of L.heads) {
+      if (hd.rest) { cur = null; hd.group = null; continue; }
       const bounds = meterBounds(hd.pc.m);
       const beatIdx = bounds.findIndex((b, k) => hd.pc.start >= b - 1e-6 && hd.pc.start < (bounds[k + 1] ?? Infinity) - 1e-6);
       const key = hd.pc.tup || `${hd.pc.m}:${beatIdx}`;
@@ -988,6 +1249,15 @@ export class LearnUI {
     const hits = [];
     this.hits = hits; // tap targets
     for (const hd of L.heads) {
+      if (hd.rest) {
+        const x = sx(hd.x);
+        hd.vis = x > L.x0 - gap * 3 && x < L.x1 + gap * 3;
+        if (!hd.vis) continue;
+        ctx.fillStyle = ctx.strokeStyle = this.editing && hd.n.si === this.sel ? C.accent : 'rgba(232,234,240,.8)';
+        drawRest(ctx, hd.pc.type.base, hd.pc.type.dots, x, top, gap);
+        hits.push({ x, y: top + 2 * gap, r: gap * 1.6, i: -1, si: hd.n.si });
+        continue;
+      }
       const x = sx(hd.x), y = yOf(hd.n), base = hd.pc.type.base;
       if (x < L.x0 - gap * 3 || x > L.x1 + gap * 3) { hd.vis = false; continue; }
       hd.vis = true; hd.sx = x; hd.y = y;
@@ -1008,7 +1278,7 @@ export class LearnUI {
         const onLine = Math.round((y - top) / (gap / 2)) % 2 === 0;
         ctx.beginPath(); ctx.arc(x + gap * (base === 'w' ? 1.2 : 1.0), y - (onLine ? gap * 0.5 : 0), gap * 0.17, 0, Math.PI * 2); ctx.fill();
       }
-      hits.push({ x, y, r: gap * 1.4, i: hd.i });
+      hits.push({ x, y, r: gap * 1.4, i: hd.i, si: hd.n.si });
       if (base === 'w') continue;
       const up = hd.group ? hd.group.up : y > mid;
       hd.up = up; hd.stemX = up ? x + gap * 0.56 : x - gap * 0.56;
